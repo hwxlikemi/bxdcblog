@@ -1,0 +1,38 @@
+---
+import type { Post } from "../data/posts";
+
+interface Props {
+  post: Post;
+}
+
+const { post } = Astro.props;
+---
+
+<article
+  class="post-card"
+  data-post-id={post.id}
+  data-title={post.title}
+  data-date={post.date}
+  data-category={post.category}
+  data-content={post.content}
+  tabindex="0"
+  role="button"
+  aria-label={`打开文章：${post.title}`}
+>
+  <div class="post-title">{post.title}</div>
+  <div class="post-meta">
+    <span>
+      <i class="fa-regular fa-calendar"></i>
+      {post.date}
+    </span>
+    <span>
+      <i class="fa-regular fa-folder"></i>
+      {post.category}
+    </span>
+  </div>
+  <p class="post-excerpt">{post.excerpt}</p>
+  <div class="post-hint">
+    <i class="fa-solid fa-arrow-right"></i>
+    点击打开文章
+  </div>
+</article>

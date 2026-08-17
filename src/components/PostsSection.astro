@@ -1,0 +1,10 @@
+---
+import { posts } from "../data/posts";
+import CategoryBar from "./CategoryBar.astro";
+import PostCard from "./PostCard.astro";
+---
+
+<main>
+  <CategoryBar />
+  {posts.map((post) => <PostCard post={post} />)}
+</main>

@@ -1,0 +1,80 @@
+<div id="commentPageOverlay">
+<div class="comment-page-curtain" id="commentCurtain">
+<div class="comment-page-container">
+<!-- 评论头部 -->
+<div class="comment-header">
+<div class="comment-header-left">
+<button class="glass-circle-btn" id="commentPageBackBtn" style="
+                            width:44px;
+                            height:44px;
+                            font-size:1rem;
+                        " type="button">
+<i class="fa-solid fa-chevron-left"></i>
+</button>
+<div>
+<div class="comment-header-title">
+                            全部评论
+                            (<span id="commentCount">0</span>)
+                        </div>
+<div class="comment-header-subtitle">
+                            分享你的想法，与其他读者交流
+                        </div>
+</div>
+</div>
+<div style="
+                        width:44px;
+                        height:44px;
+                    "></div>
+</div>
+<!-- =================================================
+                 评论编辑区域
+            ================================================== -->
+<div class="comment-editor-area">
+<!-- 昵称 + 邮箱 -->
+<div class="comment-user-fields">
+<label class="comment-small-field">
+<i class="fa-regular fa-user"></i>
+<input id="commentNameField" maxlength="30" placeholder="昵称" type="text"/>
+</label>
+<label class="comment-small-field">
+<i class="fa-regular fa-envelope"></i>
+<input id="commentEmailField" maxlength="80" placeholder="邮箱" type="text"/>
+</label>
+</div>
+<!-- 大评论框 -->
+<div class="comment-composer">
+<textarea class="comment-textarea" id="commentInputField" maxlength="1000" placeholder="善语结善缘，恶语伤人心..."></textarea>
+<!-- 图片附件预览 -->
+<div class="comment-attachment-preview" id="commentAttachmentPreview">
+<img alt="图片预览" id="attachmentPreviewImage" src=""/>
+<span id="attachmentFileName">
+                            已选择图片
+                        </span>
+<div class="remove-attachment" id="removeAttachmentBtn">
+<i class="fa-solid fa-xmark"></i>
+</div>
+</div>
+<!-- Emoji -->
+<!-- 工具栏 -->
+<div class="comment-composer-toolbar">
+<div class="composer-left-tools">
+<!-- 图片 -->
+<button class="composer-tool-btn" id="uploadImgTrigger" title="上传图片" type="button">
+<i class="fa-solid fa-plus"></i>
+</button>
+</div>
+<!-- 发送 -->
+<button class="composer-send-btn" id="sendCommentBtn" type="button">
+<i class="fa-solid fa-paper-plane"></i>
+                            发送
+                        </button>
+</div>
+</div>
+</div>
+<!-- =================================================
+                 评论列表
+            ================================================== -->
+<div class="comment-list-scroll" id="commentListScroll"></div>
+</div>
+</div>
+</div>

@@ -1,0 +1,37 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Hero from "../components/Hero.astro";
+import SidebarLeft from "../components/SidebarLeft.astro";
+import PostsSection from "../components/PostsSection.astro";
+import SidebarRight from "../components/SidebarRight.astro";
+import Footer from "../components/Footer.astro";
+import FloatingControls from "../components/FloatingControls.astro";
+import ArticleView from "../components/ArticleView.astro";
+import CommentPage from "../components/CommentPage.astro";
+import Toast from "../components/Toast.astro";
+import "../scripts/app.ts";
+---
+
+<Layout>
+  <div id="mainWrapper">
+    <Hero />
+
+    <div class="container">
+      <SidebarLeft />
+      <PostsSection />
+      <SidebarRight />
+    </div>
+
+    <Footer />
+  </div>
+
+  <FloatingControls />
+
+  <audio id="audioPlayer" preload="metadata"></audio>
+
+  <ArticleView />
+  <CommentPage />
+
+  <input id="imgFileInput" type="file" accept="image/*" />
+  <Toast />
+</Layout>
