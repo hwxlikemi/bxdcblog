@@ -1,4 +1,8 @@
-import { siteConfig } from "../config";
+// src/scripts/share-poster.ts
+
+const AUTHOR_NAME = "boxueduocai";
+const AUTHOR_AVATAR = "/assets/images/b120123.png";
+const AUTHOR_DESCRIPTION = "后来烟雨皆散尽，无人撑伞一人行";
 
 const SHARE_POSTER_STYLE_ID = "share-poster-style";
 const SHARE_POSTER_OVERLAY_ID = "sharePosterOverlay";
@@ -20,7 +24,7 @@ function injectStyles() {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 24px;
+            padding: 20px;
             background: rgba(15, 23, 42, 0.48);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
@@ -39,13 +43,13 @@ function injectStyles() {
         }
 
         .share-poster-modal {
-            width: min(440px, 100%);
-            max-height: calc(100vh - 48px);
+            width: min(430px, 100%);
+            max-height: calc(100vh - 40px);
             overflow-y: auto;
-            padding: 16px;
-            border-radius: 28px;
-            background: rgba(255, 255, 255, 0.82);
-            border: 1px solid rgba(255, 255, 255, 0.7);
+            padding: 15px;
+            border-radius: 26px;
+            background: rgba(255, 255, 255, 0.86);
+            border: 1px solid rgba(255, 255, 255, 0.72);
             box-shadow:
                 0 30px 80px rgba(15, 23, 42, 0.24),
                 0 8px 30px rgba(15, 23, 42, 0.12);
@@ -63,7 +67,7 @@ function injectStyles() {
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            padding: 4px 4px 14px;
+            padding: 3px 3px 12px;
         }
 
         .share-poster-header-title {
@@ -74,14 +78,14 @@ function injectStyles() {
 
         .share-poster-header-subtitle {
             margin-top: 3px;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: #64748b;
         }
 
         .share-poster-close {
-            width: 38px;
-            height: 38px;
-            flex: 0 0 38px;
+            width: 36px;
+            height: 36px;
+            flex: 0 0 36px;
             border: 0;
             border-radius: 50%;
             background: rgba(15, 23, 42, 0.07);
@@ -90,7 +94,7 @@ function injectStyles() {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
+            font-size: 0.95rem;
             transition:
                 transform 180ms ease,
                 background 180ms ease;
@@ -106,7 +110,7 @@ function injectStyles() {
             justify-content: center;
             width: 100%;
             overflow: hidden;
-            border-radius: 22px;
+            border-radius: 20px;
             background:
                 linear-gradient(
                     135deg,
@@ -119,7 +123,7 @@ function injectStyles() {
             display: block;
             width: min(100%, 390px);
             height: auto;
-            border-radius: 20px;
+            border-radius: 18px;
             box-shadow:
                 0 16px 35px rgba(15, 23, 42, 0.15);
         }
@@ -127,16 +131,16 @@ function injectStyles() {
         .share-poster-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            padding: 14px 2px 2px;
+            gap: 9px;
+            padding: 12px 1px 1px;
         }
 
         .share-poster-action {
-            height: 46px;
+            height: 44px;
             border: 0;
-            border-radius: 15px;
+            border-radius: 14px;
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             font-weight: 700;
             display: flex;
             align-items: center;
@@ -153,6 +157,12 @@ function injectStyles() {
 
         .share-poster-action:active {
             transform: translateY(0);
+        }
+
+        .share-poster-action:disabled {
+            opacity: 0.45;
+            cursor: default;
+            transform: none;
         }
 
         .share-poster-save {
@@ -173,8 +183,8 @@ function injectStyles() {
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.7);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.72);
             color: #334155;
             font-size: 0.85rem;
             font-weight: 600;
@@ -206,12 +216,12 @@ function injectStyles() {
 
         @media (max-width: 520px) {
             #sharePosterOverlay {
-                padding: 12px;
+                padding: 10px;
             }
 
             .share-poster-modal {
-                padding: 12px;
-                border-radius: 24px;
+                padding: 11px;
+                border-radius: 23px;
             }
 
             .share-poster-actions {
@@ -223,8 +233,8 @@ function injectStyles() {
     document.head.appendChild(style);
 }
 
-function escapeCanvasText(text: string) {
-    return text.replace(/\\s+/g, " ").trim();
+function cleanText(text: string) {
+    return text.replace(/\s+/g, " ").trim();
 }
 
 function truncateText(
@@ -232,7 +242,7 @@ function truncateText(
     text: string,
     maxWidth: number,
 ) {
-    const clean = escapeCanvasText(text);
+    const clean = cleanText(text);
 
     if (ctx.measureText(clean).width <= maxWidth) {
         return clean;
@@ -261,14 +271,42 @@ function roundedRect(
     height: number,
     radius: number,
 ) {
-    const r = Math.min(radius, width / 2, height / 2);
+    const r = Math.min(
+        radius,
+        width / 2,
+        height / 2,
+    );
 
     ctx.beginPath();
     ctx.moveTo(x + r, y);
-    ctx.arcTo(x + width, y, x + width, y + height, r);
-    ctx.arcTo(x + width, y + height, x, y + height, r);
-    ctx.arcTo(x, y + height, x, y, r);
-    ctx.arcTo(x, y, x + width, y, r);
+    ctx.arcTo(
+        x + width,
+        y,
+        x + width,
+        y + height,
+        r,
+    );
+    ctx.arcTo(
+        x + width,
+        y + height,
+        x,
+        y + height,
+        r,
+    );
+    ctx.arcTo(
+        x,
+        y + height,
+        x,
+        y,
+        r,
+    );
+    ctx.arcTo(
+        x,
+        y,
+        x + width,
+        y,
+        r,
+    );
     ctx.closePath();
 }
 
@@ -279,50 +317,71 @@ function drawCircle(
     radius: number,
 ) {
     ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.arc(
+        x,
+        y,
+        radius,
+        0,
+        Math.PI * 2,
+    );
 }
 
 async function loadImage(
     src: string,
     crossOrigin = true,
 ): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
-        const image = new Image();
+    return new Promise(
+        (resolve, reject) => {
+            const image = new Image();
 
-        if (crossOrigin) {
-            image.crossOrigin = "anonymous";
-        }
+            if (crossOrigin) {
+                image.crossOrigin = "anonymous";
+            }
 
-        image.onload = () => resolve(image);
+            image.onload = () => resolve(image);
 
-        image.onerror = () => {
-            reject(new Error(`无法加载图片：${src}`));
-        };
+            image.onerror = () =>
+                reject(
+                    new Error(
+                        `无法加载图片：${src}`,
+                    ),
+                );
 
-        image.src = src;
-    });
+            image.src = src;
+        },
+    );
 }
 
 function createInitialAvatar(
     name: string,
     size: number,
-): HTMLCanvasElement {
-    const canvas = document.createElement("canvas");
+) {
+    const canvas =
+        document.createElement("canvas");
 
     canvas.width = size;
     canvas.height = size;
 
-    const ctx = canvas.getContext("2d")!;
+    const ctx =
+        canvas.getContext("2d")!;
 
-    const gradient = ctx.createLinearGradient(
+    const gradient =
+        ctx.createLinearGradient(
+            0,
+            0,
+            size,
+            size,
+        );
+
+    gradient.addColorStop(
         0,
-        0,
-        size,
-        size,
+        "#0284c7",
     );
 
-    gradient.addColorStop(0, "#0284c7");
-    gradient.addColorStop(1, "#38bdf8");
+    gradient.addColorStop(
+        1,
+        "#38bdf8",
+    );
 
     ctx.fillStyle = gradient;
 
@@ -336,12 +395,16 @@ function createInitialAvatar(
     ctx.fill();
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = `700 ${Math.round(size * 0.38)}px Arial`;
+
+    ctx.font =
+        `700 ${Math.round(size * 0.38)}px Arial`;
+
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     const firstChar =
-        name.trim().charAt(0).toUpperCase() || "B";
+        name.trim().charAt(0).toUpperCase() ||
+        "B";
 
     ctx.fillText(
         firstChar,
@@ -372,25 +435,37 @@ async function drawAvatar(
     ctx.clip();
 
     try {
-        const image = await loadImage(
-            avatarUrl,
-            true,
-        );
+        const image =
+            await loadImage(
+                avatarUrl,
+                true,
+            );
 
-        const imageRatio =
-            image.width / image.height;
+        const ratio =
+            image.width /
+            image.height;
 
         let drawWidth = size;
         let drawHeight = size;
         let drawX = x;
         let drawY = y;
 
-        if (imageRatio > 1) {
-            drawWidth = size * imageRatio;
-            drawX = x - (drawWidth - size) / 2;
-        } else if (imageRatio < 1) {
-            drawHeight = size / imageRatio;
-            drawY = y - (drawHeight - size) / 2;
+        if (ratio > 1) {
+            drawWidth =
+                size * ratio;
+
+            drawX =
+                x -
+                (drawWidth - size) /
+                    2;
+        } else if (ratio < 1) {
+            drawHeight =
+                size / ratio;
+
+            drawY =
+                y -
+                (drawHeight - size) /
+                    2;
         }
 
         ctx.drawImage(
@@ -433,7 +508,10 @@ async function loadQrCode(
         `&dotStyle=rounded` +
         `&finderStyle=rounded`;
 
-    return loadImage(qrUrl, true);
+    return loadImage(
+        qrUrl,
+        true,
+    );
 }
 
 function drawWrappedTitle(
@@ -445,22 +523,30 @@ function drawWrappedTitle(
     lineHeight: number,
     maxLines: number,
 ) {
-    const cleanTitle = escapeCanvasText(title);
+    const cleanTitle =
+        cleanText(title);
 
     const lines: string[] = [];
     let current = "";
 
-    for (const char of cleanTitle) {
-        const test = current + char;
+    for (
+        const char of cleanTitle
+    ) {
+        const test =
+            current + char;
 
         if (
-            ctx.measureText(test).width >
+            ctx.measureText(test)
+                .width >
             maxWidth
         ) {
             lines.push(current);
             current = char;
 
-            if (lines.length >= maxLines) {
+            if (
+                lines.length >=
+                maxLines
+            ) {
                 break;
             }
         } else {
@@ -475,30 +561,28 @@ function drawWrappedTitle(
         lines.push(current);
     }
 
-    if (lines.length > maxLines) {
-        lines.length = maxLines;
-    }
-
     if (
         lines.length === maxLines &&
-        !cleanTitle.endsWith("...")
+        cleanTitle.length >
+            lines.join("").length
     ) {
-        let last = lines[maxLines - 1];
+        let last =
+            lines[maxLines - 1];
 
         while (
             ctx.measureText(
                 last + "...",
-            ).width > maxWidth &&
+            ).width >
+                maxWidth &&
             last.length > 1
         ) {
-            last = last.slice(
-                0,
-                -1,
-            );
+            last =
+                last.slice(0, -1);
         }
 
-        lines[maxLines - 1] =
-            last + "...";
+        lines[
+            maxLines - 1
+        ] = last + "...";
     }
 
     lines.forEach(
@@ -506,7 +590,9 @@ function drawWrappedTitle(
             ctx.fillText(
                 line,
                 x,
-                y + index * lineHeight,
+                y +
+                    index *
+                        lineHeight,
             );
         },
     );
@@ -518,8 +604,15 @@ async function createSharePoster(
     title: string,
     shareUrl: string,
 ) {
+    /*
+     * 海报尺寸：
+     * 1080 × 1280
+     *
+     * 比之前 1080 × 1440 更短，
+     * 更适合手机保存和分享。
+     */
     const width = 1080;
-    const height = 1440;
+    const height = 1280;
 
     const canvas =
         document.createElement(
@@ -549,7 +642,7 @@ async function createSharePoster(
     );
 
     background.addColorStop(
-        0.55,
+        0.58,
         "#ffffff",
     );
 
@@ -558,7 +651,8 @@ async function createSharePoster(
         "#e0f2fe",
     );
 
-    ctx.fillStyle = background;
+    ctx.fillStyle =
+        background;
 
     ctx.fillRect(
         0,
@@ -568,32 +662,35 @@ async function createSharePoster(
     );
 
     /*
-     * 大型几何元素
+     * 几何装饰
      */
     ctx.save();
 
     ctx.globalAlpha = 0.08;
 
-    ctx.fillStyle = "#0284c7";
+    ctx.fillStyle =
+        "#0284c7";
 
     drawCircle(
         ctx,
-        920,
-        120,
-        170,
+        940,
+        115,
+        155,
     );
 
     ctx.fill();
 
-    ctx.strokeStyle = "#0284c7";
+    ctx.strokeStyle =
+        "#0284c7";
+
     ctx.lineWidth = 3;
 
     ctx.beginPath();
 
     ctx.arc(
-        920,
-        120,
-        230,
+        940,
+        115,
+        215,
         0,
         Math.PI * 2,
     );
@@ -603,22 +700,23 @@ async function createSharePoster(
     ctx.beginPath();
 
     ctx.arc(
-        920,
-        120,
-        285,
+        940,
+        115,
+        265,
         0,
         Math.PI * 2,
     );
 
     ctx.stroke();
 
-    ctx.fillStyle = "#38bdf8";
+    ctx.fillStyle =
+        "#38bdf8";
 
     ctx.save();
 
     ctx.translate(
-        115,
-        1080,
+        110,
+        1010,
     );
 
     ctx.rotate(
@@ -627,11 +725,11 @@ async function createSharePoster(
 
     roundedRect(
         ctx,
-        -80,
-        -80,
-        160,
-        160,
-        36,
+        -60,
+        -60,
+        120,
+        120,
+        28,
     );
 
     ctx.fill();
@@ -641,53 +739,51 @@ async function createSharePoster(
     ctx.restore();
 
     /*
-     * 顶部品牌
+     * 品牌
      */
-    ctx.fillStyle = "#0284c7";
+    ctx.textAlign = "left";
+
+    ctx.fillStyle =
+        "#0284c7";
 
     ctx.font =
         "700 28px Arial, 'Microsoft YaHei', sans-serif";
 
-    ctx.textAlign = "left";
-
-    ctx.textBaseline = "alphabetic";
-
     ctx.fillText(
         "BLOG / SHARE",
-        88,
-        112,
+        82,
+        90,
     );
 
     ctx.fillStyle =
         "rgba(15, 23, 42, 0.35)";
 
     ctx.font =
-        "500 20px Arial, 'Microsoft YaHei', sans-serif";
+        "500 18px Arial, 'Microsoft YaHei', sans-serif";
 
     ctx.fillText(
         "BXDCBLOG",
-        88,
-        148,
+        82,
+        120,
     );
 
     /*
-     * 标题
+     * 文章标题
      */
-    ctx.fillStyle = "#0f172a";
+    ctx.fillStyle =
+        "#0f172a";
 
     ctx.font =
-        "700 66px Arial, 'Microsoft YaHei', sans-serif";
-
-    ctx.textAlign = "left";
+        "700 61px Arial, 'Microsoft YaHei', sans-serif";
 
     const titleLines =
         drawWrappedTitle(
             ctx,
             title || "文章分享",
-            88,
-            300,
+            82,
+            235,
             900,
-            88,
+            78,
             3,
         );
 
@@ -695,9 +791,9 @@ async function createSharePoster(
      * 分隔线
      */
     const separatorY =
-        300 +
-        titleLines * 88 +
-        50;
+        235 +
+        titleLines * 78 +
+        34;
 
     ctx.strokeStyle =
         "rgba(15, 23, 42, 0.1)";
@@ -707,12 +803,12 @@ async function createSharePoster(
     ctx.beginPath();
 
     ctx.moveTo(
-        88,
+        82,
         separatorY,
     );
 
     ctx.lineTo(
-        width - 88,
+        width - 82,
         separatorY,
     );
 
@@ -721,76 +817,87 @@ async function createSharePoster(
     /*
      * 作者
      */
-    const avatarSize = 96;
+    const avatarSize = 82;
 
-    const avatarX = 88;
+    const avatarX = 82;
+
     const avatarY =
-        separatorY + 52;
+        separatorY + 38;
 
     await drawAvatar(
         ctx,
-        siteConfig.site.author.avatar,
-        siteConfig.site.author.name,
+        AUTHOR_AVATAR,
+        AUTHOR_NAME,
         avatarX,
         avatarY,
         avatarSize,
     );
 
-    ctx.fillStyle = "#0f172a";
-
-    ctx.font =
-        "700 30px Arial, 'Microsoft YaHei', sans-serif";
-
     ctx.textAlign = "left";
 
-    ctx.fillText(
-        siteConfig.site.author.name,
-        avatarX + avatarSize + 24,
-        avatarY + 39,
-    );
-
-    ctx.fillStyle = "#64748b";
+    ctx.fillStyle =
+        "#0f172a";
 
     ctx.font =
-        "400 22px Arial, 'Microsoft YaHei', sans-serif";
+        "700 28px Arial, 'Microsoft YaHei', sans-serif";
 
     ctx.fillText(
-        siteConfig.site.author.description,
-        avatarX + avatarSize + 24,
-        avatarY + 73,
+        AUTHOR_NAME,
+        avatarX +
+            avatarSize +
+            22,
+        avatarY + 34,
+    );
+
+    ctx.fillStyle =
+        "#64748b";
+
+    ctx.font =
+        "400 19px Arial, 'Microsoft YaHei', sans-serif";
+
+    ctx.fillText(
+        truncateText(
+            ctx,
+            AUTHOR_DESCRIPTION,
+            650,
+        ),
+        avatarX +
+            avatarSize +
+            22,
+        avatarY + 64,
     );
 
     /*
-     * QR 区域
+     * 二维码
      */
-    const qrSize = 420;
+    const qrSize = 360;
 
     const qrX =
         width -
-        88 -
+        82 -
         qrSize;
 
-    const qrY = 850;
+    const qrY = 745;
 
     ctx.save();
 
     ctx.shadowColor =
         "rgba(15, 23, 42, 0.12)";
 
-    ctx.shadowBlur = 35;
+    ctx.shadowBlur = 30;
 
-    ctx.shadowOffsetY = 14;
+    ctx.shadowOffsetY = 12;
 
     ctx.fillStyle =
-        "rgba(255, 255, 255, 0.96)";
+        "rgba(255, 255, 255, 0.97)";
 
     roundedRect(
         ctx,
-        qrX - 28,
-        qrY - 28,
-        qrSize + 56,
-        qrSize + 56,
-        34,
+        qrX - 24,
+        qrY - 24,
+        qrSize + 48,
+        qrSize + 48,
+        30,
     );
 
     ctx.fill();
@@ -811,43 +918,53 @@ async function createSharePoster(
             qrSize,
         );
     } catch {
-        ctx.fillStyle = "#0f172a";
+        ctx.fillStyle =
+            "#0f172a";
 
         ctx.font =
-            "600 22px Arial, 'Microsoft YaHei', sans-serif";
+            "600 20px Arial, 'Microsoft YaHei', sans-serif";
 
-        ctx.textAlign = "center";
+        ctx.textAlign =
+            "center";
 
         ctx.fillText(
             "二维码加载失败",
-            qrX + qrSize / 2,
-            qrY + qrSize / 2,
+            qrX +
+                qrSize / 2,
+            qrY +
+                qrSize / 2,
         );
 
-        ctx.textAlign = "left";
+        ctx.textAlign =
+            "left";
     }
 
     /*
-     * 二维码说明
+     * 二维码文字
      */
-    ctx.fillStyle = "#334155";
+    ctx.textAlign =
+        "center";
+
+    ctx.fillStyle =
+        "#334155";
 
     ctx.font =
-        "600 24px Arial, 'Microsoft YaHei', sans-serif";
-
-    ctx.textAlign = "center";
+        "600 22px Arial, 'Microsoft YaHei', sans-serif";
 
     ctx.fillText(
         "扫码直达博客",
-        qrX + qrSize / 2,
-        qrY + qrSize + 68,
+        qrX +
+            qrSize / 2,
+        qrY +
+            qrSize +
+            58,
     );
 
     ctx.fillStyle =
-        "rgba(51, 65, 85, 0.6)";
+        "rgba(51, 65, 85, 0.55)";
 
     ctx.font =
-        "400 18px Arial, 'Microsoft YaHei', sans-serif";
+        "400 17px Arial, 'Microsoft YaHei', sans-serif";
 
     const shortUrl =
         truncateText(
@@ -861,23 +978,27 @@ async function createSharePoster(
 
     ctx.fillText(
         shortUrl,
-        qrX + qrSize / 2,
-        qrY + qrSize + 100,
+        qrX +
+            qrSize / 2,
+        qrY +
+            qrSize +
+            86,
     );
 
     /*
-     * 底部几何元素
+     * 底部
      */
-    ctx.textAlign = "left";
+    ctx.textAlign =
+        "left";
 
     ctx.fillStyle =
         "rgba(2, 132, 199, 0.12)";
 
     drawCircle(
         ctx,
-        92,
-        1330,
-        26,
+        85,
+        1200,
+        24,
     );
 
     ctx.fill();
@@ -887,36 +1008,35 @@ async function createSharePoster(
 
     drawCircle(
         ctx,
-        150,
-        1330,
-        12,
+        140,
+        1200,
+        11,
     );
 
     ctx.fill();
 
-    ctx.fillStyle = "#64748b";
+    ctx.fillStyle =
+        "#64748b";
 
     ctx.font =
-        "500 19px Arial, 'Microsoft YaHei', sans-serif";
+        "500 18px Arial, 'Microsoft YaHei', sans-serif";
 
     ctx.fillText(
         "记录生活 · 分享文字 · 留下思考",
-        88,
-        1380,
+        82,
+        1235,
     );
 
     ctx.fillStyle =
         "rgba(15, 23, 42, 0.32)";
 
-    ctx.font =
-        "500 18px Arial, 'Microsoft YaHei', sans-serif";
-
-    ctx.textAlign = "right";
+    ctx.textAlign =
+        "right";
 
     ctx.fillText(
         "bxdcblog.vercel.app",
-        width - 88,
-        1380,
+        width - 82,
+        1235,
     );
 
     return canvas;
@@ -1034,7 +1154,8 @@ function getPosterOverlay() {
 let currentPosterCanvas:
     HTMLCanvasElement | null = null;
 
-let currentPosterTitle = "文章分享";
+let currentPosterTitle =
+    "文章分享";
 
 let currentPosterUrl =
     window.location.href;
@@ -1077,8 +1198,11 @@ async function openSharePoster() {
     const shareUrl =
         window.location.href;
 
-    currentPosterTitle = title;
-    currentPosterUrl = shareUrl;
+    currentPosterTitle =
+        title;
+
+    currentPosterUrl =
+        shareUrl;
 
     overlay.classList.add(
         "active",
@@ -1086,6 +1210,10 @@ async function openSharePoster() {
 
     loading.style.display =
         "flex";
+
+    loading.innerHTML = `
+        <div class="share-poster-spinner"></div>
+    `;
 
     saveButton.disabled = true;
     nativeButton.disabled = true;
@@ -1149,6 +1277,7 @@ async function openSharePoster() {
                 ">
                     <i class="fa-solid fa-triangle-exclamation"></i>
                 </div>
+
                 <div>
                     海报生成失败
                 </div>
@@ -1274,8 +1403,8 @@ async function nativeSharePoster() {
 
 function bindSharePosterButtons() {
     /*
-     * 使用捕获阶段拦截原来的 shareBtn。
-     * 不需要修改原 app.ts 的分享逻辑。
+     * 拦截原有 #shareBtn，
+     * 保留原播放器/文章系统的其他功能。
      */
     document.addEventListener(
         "click",
