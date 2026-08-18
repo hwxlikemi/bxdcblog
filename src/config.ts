@@ -13,7 +13,7 @@ export const siteConfig = {
 
     author: {
       name: "boxueduocai",
-      avatar: "https://github.com/hwxlikemi.png",
+      avatar: "https://github.com/boxueduocai666.png",
       description: "后来烟雨皆散尽，无人撑伞一人行",
     },
   },

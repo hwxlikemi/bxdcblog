@@ -1061,59 +1061,6 @@ document.addEventListener(
    8. 分享
 ================================================================ */
 
-const shareBtn =
-    document.getElementById(
-        "shareBtn"
-    );
-
-
-shareBtn.addEventListener(
-    "click",
-    async () => {
-
-        const title =
-            document.getElementById(
-                "viewTitle"
-            ).innerText ||
-            "文章分享";
-
-        const shareUrl =
-            window.location.href;
-
-        if (
-            navigator.share
-        ) {
-
-            try {
-
-                await navigator.share({
-                    title: title,
-                    url: shareUrl
-                });
-
-            } catch (err) {}
-
-        } else {
-
-            try {
-
-                await navigator.clipboard.writeText(
-                    `${title} - ${shareUrl}`
-                );
-
-                showToast(
-                    "文章链接已复制到剪贴板！"
-                );
-
-            } catch (e) {
-
-                showToast(
-                    "暂不支持直接分享，链接已准备就绪"
-                );
-            }
-        }
-    }
-);
 
 
 /* ================================================================
