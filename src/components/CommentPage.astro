@@ -8,20 +8,6 @@
         <div class="comment-page-container">
 
 
-            <!-- Twikoo 隐藏初始化容器 -->
-            <!--
-                用于连接 Twikoo 后端
-                不显示官方评论 UI
-            -->
-            <div
-                id="hidden-twikoo"
-                style="
-                    display:none;
-                "
-            ></div>
-
-
-
             <!-- 评论头部 -->
 
             <div class="comment-header">
@@ -88,19 +74,18 @@
 
 
 
-            <!--
-                评论编辑区域
-            -->
+
+            <!-- 评论编辑区域 -->
+
 
             <div class="comment-editor-area">
 
-
-                <!-- 昵称 + 邮箱 -->
 
                 <div class="comment-user-fields">
 
 
                     <label class="comment-small-field">
+
 
                         <i class="fa-regular fa-user"></i>
 
@@ -114,6 +99,8 @@
 
 
                     </label>
+
+
 
 
 
@@ -134,15 +121,16 @@
                     </label>
 
 
+
                 </div>
 
 
 
 
 
-                <!-- 大评论框 -->
 
                 <div class="comment-composer">
+
 
 
                     <textarea
@@ -155,8 +143,6 @@
 
 
 
-
-                    <!-- 图片附件预览 -->
 
 
                     <div
@@ -172,11 +158,14 @@
                         />
 
 
+
                         <span id="attachmentFileName">
 
                             已选择图片
 
                         </span>
+
+
 
 
 
@@ -198,16 +187,14 @@
 
 
 
-                    <!-- 工具栏 -->
-
 
                     <div class="comment-composer-toolbar">
+
 
 
                         <div class="composer-left-tools">
 
 
-                            <!-- 图片 -->
 
                             <button
                                 class="composer-tool-btn"
@@ -222,13 +209,13 @@
                             </button>
 
 
+
                         </div>
 
 
 
 
 
-                        <!-- 发送 -->
 
 
                         <button
@@ -248,13 +235,20 @@
 
 
 
+
                     </div>
+
+
 
 
                 </div>
 
 
+
+
             </div>
+
+
 
 
 
@@ -269,8 +263,9 @@
                 id="commentListScroll"
             >
 
-
             </div>
+
+
 
 
 
@@ -281,11 +276,3 @@
 
 
 </div>
-
-
-
-
-
-<!-- Twikoo脚本 -->
-
-<script is:inline src="https://cdn.jsdelivr.net/npm/twikoo/dist/twikoo.all.min.js"></script>

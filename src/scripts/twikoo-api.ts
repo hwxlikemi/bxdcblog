@@ -96,11 +96,6 @@ export async function initTwikoo(){
         envId:
         siteConfig.twikoo.envId.replace(/\/$/,""),
 
-
-        el:
-        "#hidden-twikoo",
-
-
         path:
         window.location.pathname
 
