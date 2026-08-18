@@ -1,8 +1,7 @@
 /**
  * 全局配置
  *
- * 以后修改网站的标题、背景、Liquid Glass 参数、主题色等，
- * 优先在这里修改，不需要到各个组件里逐个查找。
+ * 网站的全局信息统一放在这里。
  */
 export const siteConfig = {
   site: {
@@ -11,6 +10,12 @@ export const siteConfig = {
     heroSubtitle: "后来烟雨皆散尽，无人撑伞一人行",
     footerText: "© 2026 boxueduocai. 保留部分权利。",
     language: "zh-CN",
+
+    author: {
+      name: "boxueduocai",
+      avatar: "https://github.com/hwxlikemi.png",
+      description: "后来烟雨皆散尽，无人撑伞一人行",
+    },
   },
 
   appearance: {
