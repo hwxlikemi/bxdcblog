@@ -9,7 +9,7 @@ export const playlist: Track[] = [
   {
     "title": "爱情信息",
     "artist": "郭静",
-    "url": "assets/music/爱情信息.mp3",
+    "url": "assets/music/爱情讯息.mp3",
     "cover": "assets/music/cover/aqxx.jpg"
   },
   {
