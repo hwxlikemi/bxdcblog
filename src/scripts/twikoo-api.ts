@@ -6,15 +6,16 @@ const TWIKOO_API =
 
 
 /**
- * 发布评论
+ * 调用 Twikoo API
  */
-export async function submitComment(
-    data:any
+async function twikooRequest(
+    action:string,
+    data:any = {}
 ){
 
-    const response =
+    const res =
         await fetch(
-            `${TWIKOO_API}/comment`,
+            `${TWIKOO_API}/api/${action}`,
             {
 
                 method:"POST",
@@ -24,39 +25,66 @@ export async function submitComment(
                     "application/json"
                 },
 
-                body:JSON.stringify({
-
-                    nick:
-                    data.nick,
-
-
-                    mail:
-                    data.mail,
-
-
-                    comment:
-                    data.comment,
-
-
-                    path:
-                    window.location.pathname
-
-                })
+                body:
+                JSON.stringify(data)
 
             }
         );
 
 
-    if(!response.ok){
+    const json =
+        await res.json();
+
+
+    if(
+        json.code !== 0
+    ){
 
         throw new Error(
-            "Twikoo comment failed"
+            json.message ||
+            "Twikoo API Error"
         );
 
     }
 
 
-    return response.json();
+    return json;
+}
+
+
+
+/**
+ * 发布评论
+ */
+export async function submitComment(
+    data:any
+){
+
+    return await twikooRequest(
+        "comment",
+        {
+
+            event:
+            "COMMENT_CREATE",
+
+
+            nick:
+            data.nick,
+
+
+            mail:
+            data.mail,
+
+
+            text:
+            data.comment,
+
+
+            path:
+            window.location.pathname
+
+        }
+    );
 
 }
 
@@ -67,23 +95,18 @@ export async function submitComment(
  */
 export async function fetchComments(){
 
-    const response =
-        await fetch(
-            `${TWIKOO_API}/comments?path=${encodeURIComponent(
-                window.location.pathname
-            )}`
-        );
+    return await twikooRequest(
+        "comment",
+        {
+
+            event:
+            "COMMENT_GET",
 
 
-    if(!response.ok){
+            path:
+            window.location.pathname
 
-        throw new Error(
-            "Twikoo load failed"
-        );
-
-    }
-
-
-    return response.json();
+        }
+    );
 
 }
