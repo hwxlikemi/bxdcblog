@@ -5,7 +5,6 @@ const TWIKOO_API =
     siteConfig.twikoo.envId;
 
 
-
 /**
  * 发布评论
  */
@@ -17,6 +16,7 @@ export async function submitComment(
         await fetch(
             `${TWIKOO_API}/comment`,
             {
+
                 method:"POST",
 
                 headers:{
@@ -42,6 +42,7 @@ export async function submitComment(
                     window.location.pathname
 
                 })
+
             }
         );
 
@@ -66,7 +67,6 @@ export async function submitComment(
  */
 export async function fetchComments(){
 
-
     const response =
         await fetch(
             `${TWIKOO_API}/comments?path=${encodeURIComponent(
@@ -85,50 +85,5 @@ export async function fetchComments(){
 
 
     return response.json();
-
-}
-
-
-export async function submitComment(data:any){
-
-    return await twikoo.addComment({
-
-        envId:
-        siteConfig.twikoo.envId,
-
-
-        path:
-        window.location.pathname,
-
-
-        nick:
-        data.nick,
-
-
-        mail:
-        data.mail,
-
-
-        comment:
-        data.comment
-
-    });
-
-}
-
-
-
-export async function fetchComments(){
-
-    return await twikoo.getComments({
-
-        envId:
-        siteConfig.twikoo.envId,
-
-
-        path:
-        window.location.pathname
-
-    });
 
 }
