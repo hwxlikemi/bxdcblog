@@ -1,15 +1,31 @@
 ---
 import "../styles/global.css";
+import { siteConfig } from "../config";
 
 interface Props {
   title?: string;
 }
 
-const { title = "boxueduocai - 后来烟雨皆散尽，无人撑伞一人行" } = Astro.props;
+const { title = siteConfig.site.title } = Astro.props;
+
+const cssVariables = `
+  --bg-image: url("${siteConfig.appearance.backgroundImage}");
+  --glass-opacity: ${siteConfig.appearance.glass.opacity};
+  --glass-blur: ${siteConfig.appearance.glass.blur}px;
+  --glass-refractive-index: ${siteConfig.appearance.glass.refractiveIndex};
+  --glass-border: ${siteConfig.appearance.glass.border};
+  --text-primary: ${siteConfig.appearance.colors.textPrimary};
+  --text-secondary: ${siteConfig.appearance.colors.textSecondary};
+  --accent-color: ${siteConfig.appearance.colors.accent};
+  --accent-light: ${siteConfig.appearance.colors.accentLight};
+  --like-red: ${siteConfig.appearance.colors.likeRed};
+  --animation-time: ${siteConfig.appearance.animation.time}ms;
+  --comment-animation-time: ${siteConfig.appearance.animation.commentTime}ms;
+`;
 ---
 
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang={siteConfig.site.language} style={cssVariables}>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />

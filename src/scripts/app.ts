@@ -1,3 +1,6 @@
+import { playlist } from "../data/music";
+import { siteConfig } from "../config";
+
 /* ================================================================
    1. 动态日历
 ================================================================ */
@@ -211,25 +214,11 @@ function showToast(msg) {
    4. 音乐播放器
 ================================================================ */
 
-const playlist = [
+const currentPlaylist = playlist;
 
-    {
-        title: "爱情信息",
-        artist: "郭静",
-        url: "assets/music/爱情信息.mp3",
-        cover: "1000067252_2.jpg"
-    },
 
-    {
-        title: "示例歌曲二",
-        artist: "未知歌手",
-        url: "assets/music/song2.mp3",
-        cover: "1000067252_2.jpg"
-    }
 
-];
-
-let currentTrackIndex = 0;
+let currentTrackIndex = siteConfig.music.defaultTrackIndex;
 
 const audioPlayer =
     document.getElementById(
@@ -339,12 +328,12 @@ const popNextBtn =
 
 function loadTrack(index) {
 
-    if (!playlist[index]) {
+    if (!currentPlaylist[index]) {
         return;
     }
 
     const track =
-        playlist[index];
+        currentPlaylist[index];
 
     audioPlayer.src =
         track.url;
@@ -444,9 +433,9 @@ prevBtn.addEventListener(
             (
                 currentTrackIndex -
                 1 +
-                playlist.length
+                currentPlaylist.length
             ) %
-            playlist.length;
+            currentPlaylist.length;
 
         loadTrack(
             currentTrackIndex
@@ -473,7 +462,7 @@ nextBtn.addEventListener(
                 currentTrackIndex +
                 1
             ) %
-            playlist.length;
+            currentPlaylist.length;
 
         loadTrack(
             currentTrackIndex

@@ -1,0 +1,46 @@
+/**
+ * 全局配置
+ *
+ * 以后修改网站的标题、背景、Liquid Glass 参数、主题色等，
+ * 优先在这里修改，不需要到各个组件里逐个查找。
+ */
+export const siteConfig = {
+  site: {
+    title: "boxueduocai - 后来烟雨皆散尽，无人撑伞一人行",
+    heroTitle: "boxueduocai's Blog",
+    heroSubtitle: "后来烟雨皆散尽，无人撑伞一人行",
+    footerText: "© 2026 boxueduocai. 保留部分权利。",
+    language: "zh-CN",
+  },
+
+  appearance: {
+    backgroundImage:
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80",
+
+    glass: {
+      opacity: 0.08,
+      blur: 28,
+      refractiveIndex: 1.33,
+      border: "rgba(255, 255, 255, 0.45)",
+    },
+
+    colors: {
+      textPrimary: "#0f172a",
+      textSecondary: "#334155",
+      accent: "#0284c7",
+      accentLight: "#38bdf8",
+      likeRed: "#f43f5e",
+    },
+
+    animation: {
+      time: 420,
+      commentTime: 560,
+    },
+  },
+
+  music: {
+    defaultTrackIndex: 0,
+  },
+} as const;
+
+export type SiteConfig = typeof siteConfig;

@@ -22,6 +22,26 @@
 - `public/assets/music/`：本地音乐
 - `.github/workflows/deploy.yml`：GitHub Pages 部署
 
+## 全局配置
+
+网站的全局可调参数统一放在：
+
+```text
+src/config.ts
+```
+
+可以直接在这里修改：
+
+- 网站标题、Hero 标题、副标题
+- Footer 文案
+- 背景图片
+- Liquid Glass 透明度、模糊度、折射率
+- 主题色、强调色、点赞颜色
+- 动画时长
+- 默认音乐曲目
+
+修改 `src/config.ts` 后，重新执行 `pnpm build` 即可生效。
+
 ## 本地资源
 
 请将原 HTML 引用的实际二进制文件放入：
