@@ -1,113 +1,126 @@
 import { siteConfig } from "../config";
 
 
-
-const TWIKOO_API =
-    siteConfig.twikoo.envId.replace(/\/$/, "");
+let twikooInstance:any = null;
 
 
-/**
- * 调用 Twikoo API
- */
-async function twikooRequest(
-    action:string,
-    data:any = {}
-){
+function loadTwikoo(){
 
-    const res =
-        await fetch(
-            `${TWIKOO_API}/api/${action}`,
-            {
+    return new Promise((resolve,reject)=>{
 
-                method:"POST",
 
-                headers:{
-                    "Content-Type":
-                    "application/json"
-                },
+        if((window as any).twikoo){
 
-                body:
-                JSON.stringify(data)
+            resolve(
+                (window as any).twikoo
+            );
 
-            }
+            return;
+        }
+
+
+
+        const script =
+        document.createElement("script");
+
+
+        script.src =
+        "https://cdn.jsdelivr.net/npm/twikoo/dist/twikoo.all.min.js";
+
+
+        script.onload = ()=>{
+
+            resolve(
+                (window as any).twikoo
+            );
+
+        };
+
+
+        script.onerror =
+        reject;
+
+
+        document.head.appendChild(
+            script
         );
 
 
-    const json =
-        await res.json();
+    });
+
+}
 
 
-    if(
-        json.code !== 0
-    ){
 
-        throw new Error(
-            json.message ||
-            "Twikoo API Error"
-        );
+async function getTwikoo(){
+
+    if(twikooInstance){
+
+        return twikooInstance;
 
     }
 
 
-    return json;
+    twikooInstance =
+        await loadTwikoo();
+
+
+    return twikooInstance;
+
 }
 
 
 
-/**
- * 发布评论
- */
+
 export async function submitComment(
     data:any
 ){
 
-    return await twikooRequest(
-        "comment",
-        {
-
-            event:
-            "COMMENT_CREATE",
+    const twikoo =
+        await getTwikoo();
 
 
-            nick:
-            data.nick,
+
+    return twikoo.init({
+
+        envId:
+        siteConfig.twikoo.envId,
 
 
-            mail:
-            data.mail,
+        el:
+        "#hidden-twikoo",
 
 
-            text:
-            data.comment,
+        path:
+        window.location.pathname
 
 
-            path:
-            window.location.pathname
-
-        }
-    );
+    });
 
 }
 
 
 
-/**
- * 获取评论
- */
-export async function fetchComments(){
 
-    return await twikooRequest(
-        "comment",
-        {
+export async function initTwikoo(){
 
-            event:
-            "COMMENT_GET",
+    const twikoo =
+        await getTwikoo();
 
 
-            path:
-            window.location.pathname
+    return twikoo.init({
 
-        }
-    );
+        envId:
+        siteConfig.twikoo.envId,
+
+
+        el:
+        "#hidden-twikoo",
+
+
+        path:
+        window.location.pathname
+
+    });
 
 }
