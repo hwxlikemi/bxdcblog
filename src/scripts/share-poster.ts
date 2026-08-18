@@ -1,5 +1,3 @@
-// src/scripts/share-poster.ts
-
 const AUTHOR_NAME = "boxueduocai";
 const AUTHOR_AVATAR = "/assets/images/b120123.png";
 const AUTHOR_DESCRIPTION = "后来烟雨皆散尽，无人撑伞一人行";
@@ -127,7 +125,7 @@ function injectStyles() {
                         1
                     ),
                 opacity 420ms ease,
-                filter 560ms ease,
+                filter 420ms ease,
                 clip-path 680ms
                     cubic-bezier(
                         0.16,
@@ -1678,7 +1676,7 @@ function playOpenAnimation(
 
             modal.style.transition = `
                 transform
-                    720ms
+                    520ms
                     cubic-bezier(
                         0.16,
                         1,
@@ -1696,7 +1694,7 @@ function playOpenAnimation(
                     ),
 
                 filter
-                    560ms
+                    420ms
                     cubic-bezier(
                         0.16,
                         1,
@@ -1705,7 +1703,7 @@ function playOpenAnimation(
                     ),
 
                 border-radius
-                    720ms
+                    520ms
                     cubic-bezier(
                         0.16,
                         1,
@@ -1714,7 +1712,7 @@ function playOpenAnimation(
                     ),
 
                 clip-path
-                    720ms
+                    520ms
                     cubic-bezier(
                         0.16,
                         1,
@@ -1789,6 +1787,16 @@ function playCloseAnimation(
             overlay,
         );
 
+    const preview =
+        modal.querySelector(
+            ".share-poster-preview-wrap"
+        ) as HTMLElement | null;
+
+    const actions =
+        modal.querySelector(
+            ".share-poster-actions"
+        ) as HTMLElement | null;
+
 
     if (!button) {
         modal.style.opacity =
@@ -1848,7 +1856,7 @@ function playCloseAnimation(
 
     modal.style.transition = `
         transform
-            540ms
+            420ms
             cubic-bezier(
                 0.4,
                 0,
@@ -1861,7 +1869,7 @@ function playCloseAnimation(
             ease,
 
         filter
-            460ms
+            340ms
             cubic-bezier(
                 0.4,
                 0,
@@ -1870,7 +1878,7 @@ function playCloseAnimation(
             ),
 
         border-radius
-            540ms
+            420ms
             cubic-bezier(
                 0.4,
                 0,
@@ -1879,7 +1887,7 @@ function playCloseAnimation(
             ),
 
         clip-path
-            540ms
+            420ms
             cubic-bezier(
                 0.4,
                 0,
@@ -1888,6 +1896,22 @@ function playCloseAnimation(
             )
     `;
 
+
+    if (preview) {
+        preview.style.transition =
+            "transform 420ms cubic-bezier(0.4,0,1,1), opacity 260ms ease";
+        preview.style.transform =
+            "scale(0.92)";
+        preview.style.opacity =
+            "0";
+    }
+
+    if (actions) {
+        actions.style.transition =
+            "opacity 220ms ease";
+        actions.style.opacity =
+            "0";
+    }
 
     modal.style.filter =
         "blur(8px)";
@@ -1950,7 +1974,16 @@ function playCloseAnimation(
         modal.style.clipPath =
             "";
 
-    }, 560);
+        if (preview) {
+            preview.style.transform = "";
+            preview.style.opacity = "";
+        }
+
+        if (actions) {
+            actions.style.opacity = "";
+        }
+
+    }, 440);
 }
 
 
