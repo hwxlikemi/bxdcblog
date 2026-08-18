@@ -9,7 +9,6 @@ import FloatingControls from "../components/FloatingControls.astro";
 import ArticleView from "../components/ArticleView.astro";
 import CommentPage from "../components/CommentPage.astro";
 import Toast from "../components/Toast.astro";
-import "../scripts/app.ts";
 ---
 
 <Layout>
@@ -35,3 +34,7 @@ import "../scripts/app.ts";
   <input id="imgFileInput" type="file" accept="image/*" />
   <Toast />
 </Layout>
+
+<script>
+  import "../scripts/app.ts";
+</script>
