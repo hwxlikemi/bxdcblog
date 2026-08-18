@@ -1,5 +1,11 @@
 import { playlist } from "../data/music";
 import { siteConfig } from "../config";
+import {
+    submitComment,
+    fetchComments
+}
+from "./twikoo-api";
+
 /* ================================================================
    1. 动态日历
 ================================================================ */
@@ -207,70 +213,6 @@ function showToast(msg) {
         2200
     );
 }
-
-
-/* ================================================================
-   Twikoo 官方评论系统初始化
-   保留原评论扩散动画与页面结构，仅替换评论数据层
-================================================================ */
-
-let twikooLoaded = false;
-
-function loadTwikooScript(){
-
-    return new Promise((resolve, reject)=>{
-
-        if((window as any).twikoo){
-            resolve((window as any).twikoo);
-            return;
-        }
-
-        const script = document.createElement("script");
-
-        script.src =
-            "https://cdn.jsdelivr.net/npm/twikoo@1.6.39/dist/twikoo.all.min.js";
-
-        script.onload = ()=>{
-            resolve((window as any).twikoo);
-        };
-
-        script.onerror = reject;
-
-        document.head.appendChild(script);
-    });
-}
-
-async function initTwikooComments(){
-
-    if(twikooLoaded || !siteConfig.twikoo.enable){
-        return;
-    }
-
-    const container = document.getElementById("tcomment");
-
-    if(!container){
-        return;
-    }
-
-    try{
-
-        const twikoo:any =
-            await loadTwikooScript();
-
-        await twikoo.init({
-            envId: siteConfig.twikoo.envId,
-            el: "#tcomment",
-            path: window.location.pathname,
-            lang: "zh-CN"
-        });
-
-        twikooLoaded = true;
-
-    }catch(error){
-        console.error("Twikoo加载失败", error);
-    }
-}
-
 
 
 /* ================================================================
@@ -1210,10 +1152,6 @@ commentBtn.addEventListener(
             "active"
         );
 
-        setTimeout(() => {
-            initTwikooComments();
-        }, 600);
-
         /*
          * 等动画完成后解除锁定。
          */
@@ -1326,9 +1264,206 @@ function escapeHtml(
 
 
 /* ================================================================
-   14. Twikoo 评论加载
-   评论提交、回复、点赞均交给官方 Twikoo UI。
+   14. 发布评论（Twikoo API）
 ================================================================ */
+
+const sendCommentBtn =
+    document.getElementById(
+        "sendCommentBtn"
+    );
+
+const commentListScroll =
+    document.getElementById(
+        "commentListScroll"
+    );
+
+const commentCount =
+    document.getElementById(
+        "commentCount"
+    );
+
+const commentNameField =
+    document.getElementById(
+        "commentNameField"
+    );
+
+const commentEmailField =
+    document.getElementById(
+        "commentEmailField"
+    );
+
+
+sendCommentBtn?.addEventListener(
+    "click",
+    sendComment
+);
+
+
+async function sendComment() {
+
+    const val =
+        commentInputField.value.trim();
+
+    const name =
+        commentNameField.value.trim();
+
+    const email =
+        commentEmailField.value.trim();
+
+
+    if (!name) {
+
+        showToast(
+            "请先填写昵称"
+        );
+
+        commentNameField.focus();
+
+        return;
+    }
+
+
+    if (!val) {
+
+        showToast(
+            "请输入评论内容"
+        );
+
+        commentInputField.focus();
+
+        return;
+    }
+
+
+    if (!email) {
+
+        showToast(
+            "请先填写邮箱"
+        );
+
+        commentEmailField.focus();
+
+        return;
+    }
+
+
+    try {
+
+        await submitComment({
+
+            nick:name,
+
+            mail:email,
+
+            comment:val
+
+        });
+
+
+        showToast(
+            "评论发布成功！"
+        );
+
+
+        commentInputField.value = "";
+
+        commentInputField.placeholder =
+            "善语结善缘，恶语伤人心...";
+
+
+        currentReplyTarget =
+            null;
+
+
+        loadTwikooComments();
+
+
+    } catch(e) {
+
+        showToast(
+            "评论发布失败"
+        );
+
+    }
+
+}
+
+
+
+/* ================================================================
+   Twikoo 评论加载
+================================================================ */
+
+async function loadTwikooComments(){
+
+    try {
+
+        const comments =
+            await fetchComments();
+
+
+        if(!commentListScroll){
+            return;
+        }
+
+
+        commentListScroll.innerHTML =
+            "";
+
+
+        comments.forEach(
+            item => {
+
+                const node =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                node.className =
+                    "comment-node";
+
+
+                node.innerHTML =
+                `
+                <img
+                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(item.nick || "user")}"
+                    class="comment-avatar"
+                >
+
+                <div class="comment-content-box">
+
+                    <div class="comment-user-name">
+                        ${escapeHtml(item.nick || "")}
+                    </div>
+
+                    <div class="comment-text">
+                        ${escapeHtml(item.comment || "")}
+                    </div>
+
+                </div>
+                `;
+
+
+                commentListScroll.appendChild(
+                    node
+                );
+
+            }
+        );
+
+
+    } catch(e) {
+
+        console.error(
+            "Twikoo加载失败",
+            e
+        );
+
+    }
+
+}
+
 
 /* ================================================================
    15. 评论点赞
