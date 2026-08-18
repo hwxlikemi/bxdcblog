@@ -1,215 +1,22 @@
-// src/scripts/app.ts
+// src/scripts/app.ts 第一部分
 
 import { playlist } from "../data/music";
 import { siteConfig } from "../config";
 
+import {
+    submitComment,
+    fetchComments
+} from "./twikoo-api";
 
-/*
-========================================================
-Twikoo 配置
-只作为评论 API 使用
-不渲染官方评论界面
-========================================================
-*/
 
-declare global {
-    interface Window {
-        twikoo?: any;
-        twikooReady?: boolean;
-    }
-}
 
+/* ================================================================
+   Twikoo 配置
+   仅作为 API 使用
+   不加载 Twikoo 官方 UI
+================================================================ */
 
-let twikooInstance:any = null;
-
-
-/*
-========================================================
-初始化 Twikoo
-========================================================
-*/
-
-async function initTwikoo(){
-
-    if(
-        window.twikooReady
-    ){
-        return;
-    }
-
-
-    if(
-        !window.twikoo
-    ){
-
-        console.error(
-            "Twikoo脚本未加载"
-        );
-
-        return;
-    }
-
-
-
-    try{
-
-        twikooInstance =
-            await window.twikoo.init({
-
-                envId:
-                    "https://kwitoo-bxdc.vercel.app",
-
-                el:
-                    "#hidden-twikoo",
-
-                path:
-                    location.pathname
-
-            });
-
-
-
-        window.twikooReady =
-            true;
-
-
-        console.log(
-            "Twikoo初始化成功"
-        );
-
-
-    }catch(e){
-
-        console.error(
-            "Twikoo初始化失败",
-            e
-        );
-
-    }
-
-}
-
-
-
-initTwikoo();
-
-
-
-
-
-/*
-========================================================
-Twikoo 发布评论
-========================================================
-*/
-
-
-async function submitTwikooComment(data:any){
-
-    if(
-        !window.twikoo
-    ){
-
-        throw new Error(
-            "Twikoo未加载"
-        );
-
-    }
-
-
-    /*
-        使用 Twikoo 内部 API
-        不显示官方 UI
-    */
-
-
-    const result =
-        await window.twikoo.addComment({
-
-            envId:
-                "https://kwitoo-bxdc.vercel.app",
-
-            path:
-                location.pathname,
-
-            nick:
-                data.nick,
-
-            mail:
-                data.mail,
-
-            comment:
-                data.comment
-
-        });
-
-
-
-    return result;
-
-}
-
-
-
-
-
-/*
-========================================================
-获取评论
-========================================================
-*/
-
-
-async function getTwikooComments(){
-
-
-    if(
-        !window.twikoo
-    ){
-
-        return [];
-
-    }
-
-
-
-    try{
-
-
-        const result =
-            await window.twikoo.getComments({
-
-                envId:
-                    "https://kwitoo-bxdc.vercel.app",
-
-                path:
-                    location.pathname
-
-            });
-
-
-
-        return result;
-
-
-    }catch(e){
-
-
-        console.error(
-            "获取评论失败",
-            e
-        );
-
-
-        return [];
-
-    }
-
-
-}
-
-
-
+const TWIKOO_API_ONLY = true;
 
 
 
@@ -217,27 +24,25 @@ async function getTwikooComments(){
 1. 动态日历
 ================================================================ */
 
-
 function renderDynamicCalendar() {
-
 
     const calendarTitle =
         document.getElementById(
             "calendarTitle"
-        );
+        ) as HTMLElement | null;
 
 
     const calendarGrid =
         document.getElementById(
             "calendarGrid"
-        );
+        ) as HTMLElement | null;
 
 
 
-    if(
+    if (
         !calendarTitle ||
         !calendarGrid
-    ){
+    ) {
         return;
     }
 
@@ -252,10 +57,8 @@ function renderDynamicCalendar() {
         now.getFullYear();
 
 
-
     const month =
         now.getMonth();
-
 
 
     const todayDate =
@@ -269,14 +72,12 @@ function renderDynamicCalendar() {
         );
 
 
-
     if(titleSpan){
 
         titleSpan.innerText =
-            `${year}年 ${month+1}月`;
+            `${year}年 ${month + 1}月`;
 
     }
-
 
 
 
@@ -293,10 +94,12 @@ function renderDynamicCalendar() {
 
 
     headers.forEach(
-        header=>{
+        header => {
+
             calendarGrid.appendChild(
                 header
             );
+
         }
     );
 
@@ -312,27 +115,24 @@ function renderDynamicCalendar() {
 
 
     const startOffset =
-        firstDay===0
-        ?
-        6
-        :
-        firstDay-1;
+        firstDay === 0
+            ? 6
+            : firstDay - 1;
 
 
 
     const daysInMonth =
         new Date(
             year,
-            month+1,
+            month + 1,
             0
         ).getDate();
 
 
 
-
     for(
-        let i=0;
-        i<startOffset;
+        let i = 0;
+        i < startOffset;
         i++
     ){
 
@@ -356,8 +156,8 @@ function renderDynamicCalendar() {
 
 
     for(
-        let day=1;
-        day<=daysInMonth;
+        let day = 1;
+        day <= daysInMonth;
         day++
     ){
 
@@ -377,7 +177,7 @@ function renderDynamicCalendar() {
 
 
         if(
-            day===todayDate
+            day === todayDate
         ){
 
             dayCell.classList.add(
@@ -398,24 +198,699 @@ function renderDynamicCalendar() {
 
 
 renderDynamicCalendar();
-/*
-========================================================
-14. 发布评论（Twikoo API）
-替换原来的 submitComment
-========================================================
-*/
 
 
-const sendCommentBtn =
+
+
+
+/* ================================================================
+2. 玻璃参数实时调节
+================================================================ */
+
+
+const opacityRange =
 document.getElementById(
-    "sendCommentBtn"
+    "opacityRange"
+) as HTMLInputElement | null;
+
+
+
+const blurRange =
+document.getElementById(
+    "blurRange"
+) as HTMLInputElement | null;
+
+
+
+const opacityVal =
+document.getElementById(
+    "opacityVal"
 );
+
+
+
+const blurVal =
+document.getElementById(
+    "blurVal"
+);
+
+
+
+
+opacityRange?.addEventListener(
+    "input",
+    (e)=>{
+
+        const value =
+            Number(
+                (e.target as HTMLInputElement).value
+            );
+
+
+        document.documentElement.style.setProperty(
+            "--glass-opacity",
+            String(value)
+        );
+
+
+        if(opacityVal){
+
+            opacityVal.innerText =
+                Math.round(
+                    value * 100
+                ) + "%";
+
+        }
+
+    }
+);
+
+
+
+
+blurRange?.addEventListener(
+    "input",
+    (e)=>{
+
+
+        const value =
+            Number(
+                (e.target as HTMLInputElement).value
+            );
+
+
+        document.documentElement.style.setProperty(
+            "--glass-blur",
+            value + "px"
+        );
+
+
+
+        if(blurVal){
+
+            blurVal.innerText =
+                value + "px";
+
+        }
+
+
+    }
+);
+
+
+
+
+const refractiveRange =
+document.getElementById(
+    "refractiveRange"
+) as HTMLInputElement | null;
+
+
+
+const refractiveVal =
+document.getElementById(
+    "refractiveVal"
+);
+
+
+
+refractiveRange?.addEventListener(
+    "input",
+    (e)=>{
+
+
+        const value =
+            Number(
+                (e.target as HTMLInputElement).value
+            );
+
+
+
+        document.documentElement.style.setProperty(
+            "--glass-refractive-index",
+            String(value)
+        );
+
+
+
+        if(refractiveVal){
+
+            refractiveVal.innerText =
+                value.toFixed(2);
+
+        }
+
+
+    }
+);
+
+
+
+
+
+/* ================================================================
+3. Toast
+================================================================ */
+
+
+function showToast(
+    msg:string
+){
+
+    const toast =
+        document.getElementById(
+            "glassToast"
+        );
+
+
+
+    if(!toast){
+        return;
+    }
+
+
+
+    toast.innerText =
+        msg;
+
+
+
+    toast.classList.add(
+        "show"
+    );
+
+
+
+    setTimeout(
+        ()=>{
+
+            toast.classList.remove(
+                "show"
+            );
+
+        },
+        2200
+    );
+
+}
+/* ================================================================
+4. 音乐播放器
+================================================================ */
+
+import { playlist } from "../data/music";
+
+let currentTrackIndex =
+    siteConfig.music.defaultTrackIndex;
+
+
+
+const audioPlayer =
+document.getElementById(
+    "audioPlayer"
+) as HTMLAudioElement | null;
+
+
+const largeCover =
+document.getElementById(
+    "largeCover"
+) as HTMLImageElement | null;
+
+
+const largeTitle =
+document.getElementById(
+    "largeTitle"
+);
+
+
+
+const largeArtist =
+document.getElementById(
+    "largeArtist"
+);
+
+
+
+const mainPlayBtn =
+document.getElementById(
+    "mainPlayBtn"
+);
+
+
+
+const mainPlayIcon =
+document.getElementById(
+    "mainPlayIcon"
+);
+
+
+
+const musicToggleBtn =
+document.getElementById(
+    "musicToggleBtn"
+);
+
+
+
+const musicPopover =
+document.getElementById(
+    "musicPopover"
+);
+
+
+
+const musicCover =
+document.getElementById(
+    "musicCover"
+) as HTMLImageElement | null;
+
+
+
+const popTitle =
+document.getElementById(
+    "popTitle"
+);
+
+
+
+const popArtist =
+document.getElementById(
+    "popArtist"
+);
+
+
+
+const popPlayBtn =
+document.getElementById(
+    "popPlayBtn"
+);
+
+
+
+const popPlayIcon =
+document.getElementById(
+    "popPlayIcon"
+);
+
+
+
+const prevBtn =
+document.getElementById(
+    "prevBtn"
+);
+
+
+
+const nextBtn =
+document.getElementById(
+    "nextBtn"
+);
+
+
+
+const popPrevBtn =
+document.getElementById(
+    "popPrevBtn"
+);
+
+
+
+const popNextBtn =
+document.getElementById(
+    "popNextBtn"
+);
+
+
+
+function loadTrack(
+    index:number
+){
+
+    if(
+        !playlist[index] ||
+        !audioPlayer
+    ){
+        return;
+    }
+
+
+
+    const track =
+        playlist[index];
+
+
+
+    audioPlayer.src =
+        track.url;
+
+
+
+    if(largeTitle){
+
+        largeTitle.innerText =
+            track.title;
+
+    }
+
+
+
+    if(popTitle){
+
+        popTitle.innerText =
+            track.title;
+
+    }
+
+
+
+    if(largeArtist){
+
+        largeArtist.innerText =
+            track.artist;
+
+    }
+
+
+
+    if(popArtist){
+
+        popArtist.innerText =
+            track.artist;
+
+    }
+
+
+
+    if(largeCover){
+
+        largeCover.src =
+            track.cover;
+
+    }
+
+
+
+    if(musicCover){
+
+        musicCover.src =
+            track.cover;
+
+    }
+
+}
+
+
+
+loadTrack(
+    currentTrackIndex
+);
+
+
+
+
+
+musicToggleBtn?.addEventListener(
+    "click",
+    (e)=>{
+
+        e.stopPropagation();
+
+
+        musicPopover?.classList.toggle(
+            "active"
+        );
+
+    }
+);
+
+
+
+
+
+document.addEventListener(
+    "click",
+    (e)=>{
+
+        if(
+            !musicPopover?.contains(
+                e.target as Node
+            ) &&
+            e.target !== musicToggleBtn
+        ){
+
+            musicPopover?.classList.remove(
+                "active"
+            );
+
+        }
+
+    }
+);
+
+
+
+
+
+function togglePlay(){
+
+    if(
+        !audioPlayer
+    ){
+        return;
+    }
+
+
+
+    if(
+        audioPlayer.paused
+    ){
+
+        audioPlayer.play();
+
+    }else{
+
+        audioPlayer.pause();
+
+    }
+
+}
+
+
+
+mainPlayBtn?.addEventListener(
+    "click",
+    togglePlay
+);
+
+
+
+popPlayBtn?.addEventListener(
+    "click",
+    togglePlay
+);
+
+
+
+
+
+prevBtn?.addEventListener(
+    "click",
+    ()=>{
+
+
+        currentTrackIndex =
+            (
+                currentTrackIndex -
+                1 +
+                playlist.length
+            )
+            %
+            playlist.length;
+
+
+
+        loadTrack(
+            currentTrackIndex
+        );
+
+
+
+        audioPlayer?.play();
+
+
+    }
+);
+
+
+
+
+
+nextBtn?.addEventListener(
+    "click",
+    ()=>{
+
+
+        currentTrackIndex =
+            (
+                currentTrackIndex +
+                1
+            )
+            %
+            playlist.length;
+
+
+
+        loadTrack(
+            currentTrackIndex
+        );
+
+
+
+        audioPlayer?.play();
+
+
+    }
+);
+
+
+
+
+
+popPrevBtn?.addEventListener(
+    "click",
+    ()=>prevBtn?.click()
+);
+
+
+
+popNextBtn?.addEventListener(
+    "click",
+    ()=>nextBtn?.click()
+);
+
+
+
+
+
+audioPlayer?.addEventListener(
+    "play",
+    ()=>{
+
+        if(mainPlayIcon){
+
+            mainPlayIcon.className =
+                "fa-solid fa-pause";
+
+        }
+
+
+
+        if(popPlayIcon){
+
+            popPlayIcon.className =
+                "fa-solid fa-pause";
+
+        }
+
+
+
+    }
+);
+
+
+
+
+
+audioPlayer?.addEventListener(
+    "pause",
+    ()=>{
+
+
+        if(mainPlayIcon){
+
+            mainPlayIcon.className =
+                "fa-solid fa-play";
+
+        }
+
+
+
+        if(popPlayIcon){
+
+            popPlayIcon.className =
+                "fa-solid fa-play";
+
+        }
+
+
+    }
+);
+
+
+
+
+
+
+/* ================================================================
+9. 评论系统
+Twikoo API模式
+不渲染官方UI
+================================================================ */
+
+
+const commentBtn =
+document.getElementById(
+    "commentBtn"
+);
+
+
+
+const commentPageOverlay =
+document.getElementById(
+    "commentPageOverlay"
+);
+
+
+
+const commentCurtain =
+document.getElementById(
+    "commentCurtain"
+);
+
+
+
+const commentPageBackBtn =
+document.getElementById(
+    "commentPageBackBtn"
+);
+
+
+
+const commentInputField =
+document.getElementById(
+    "commentInputField"
+) as HTMLTextAreaElement | null;
+
+
+
+const commentNameField =
+document.getElementById(
+    "commentNameField"
+) as HTMLInputElement | null;
+
+
+
+const commentEmailField =
+document.getElementById(
+    "commentEmailField"
+) as HTMLInputElement | null;
+
 
 
 const commentListScroll =
 document.getElementById(
     "commentListScroll"
 );
+
 
 
 const commentCount =
@@ -425,204 +900,162 @@ document.getElementById(
 
 
 
-const commentNameField =
+const sendCommentBtn =
 document.getElementById(
-    "commentNameField"
-);
-
-
-const commentEmailField =
-document.getElementById(
-    "commentEmailField"
+    "sendCommentBtn"
 );
 
 
 
-sendCommentBtn?.addEventListener(
+let commentAnimationLocked =
+false;
+
+
+
+
+
+/* 打开评论页面 */
+
+commentBtn?.addEventListener(
     "click",
-    sendComment
+    ()=>{
+
+
+        if(commentAnimationLocked){
+            return;
+        }
+
+
+
+        commentAnimationLocked =
+            true;
+
+
+
+        const rect =
+            commentBtn.getBoundingClientRect();
+
+
+
+        commentCurtain?.style.setProperty(
+            "--cx",
+            rect.left +
+            rect.width / 2 +
+            "px"
+        );
+
+
+
+        commentCurtain?.style.setProperty(
+            "--cy",
+            rect.top +
+            rect.height / 2 +
+            "px"
+        );
+
+
+
+        commentPageOverlay?.classList.remove(
+            "closing"
+        );
+
+
+
+        commentPageOverlay?.classList.add(
+            "active"
+        );
+
+
+
+        setTimeout(
+            ()=>{
+
+                commentAnimationLocked =
+                    false;
+
+            },
+            600
+        );
+
+    }
 );
 
 
 
 
 
-async function sendComment(){
+function closeCommentPage(){
 
-
-    const val =
-        (document.getElementById(
-            "commentInputField"
-        ) as HTMLTextAreaElement)
-        ?.value
-        .trim();
-
-
-
-    const name =
-        (
-            commentNameField as HTMLInputElement
-        )
-        ?.value
-        .trim();
-
-
-
-    const email =
-        (
-            commentEmailField as HTMLInputElement
-        )
-        ?.value
-        .trim();
-
-
-
-
-
-    if(!name){
-
-
-        showToast(
-            "请先填写昵称"
-        );
-
-
-        commentNameField?.focus();
-
-
+    if(commentAnimationLocked){
         return;
-
     }
 
 
 
+    commentAnimationLocked =
+        true;
 
 
-    if(!val){
+
+    commentPageOverlay?.classList.add(
+        "closing"
+    );
 
 
-        showToast(
-            "请输入评论内容"
+
+    setTimeout(
+        ()=>{
+
+            commentPageOverlay?.classList.remove(
+                "active"
+            );
+
+
+
+            commentPageOverlay?.classList.remove(
+                "closing"
+            );
+
+
+
+            commentAnimationLocked =
+                false;
+
+
+        },
+        600
+    );
+
+}
+
+
+
+commentPageBackBtn?.addEventListener(
+    "click",
+    closeCommentPage
+);
+
+
+
+
+
+/* HTML转义 */
+
+function escapeHtml(
+    text:string
+){
+
+    const div =
+        document.createElement(
+            "div"
         );
 
 
-        return;
+    div.textContent =
+        text;
 
-    }
 
-
-
-
-
-    if(!email){
-
-
-        showToast(
-            "请先填写邮箱"
-        );
-
-
-        return;
-
-    }
-
-
-
-
-
-
-    try{
-
-
-        sendCommentBtn?.setAttribute(
-            "disabled",
-            "true"
-        );
-
-
-
-        await submitTwikooComment({
-
-            nick:
-                name,
-
-
-            mail:
-                email,
-
-
-            comment:
-                val
-
-        });
-
-
-
-
-
-
-        showToast(
-            "评论发布成功！"
-        );
-
-
-
-
-
-
-        (
-            document.getElementById(
-                "commentInputField"
-            ) as HTMLTextAreaElement
-        ).value = "";
-
-
-
-
-        (
-            document.getElementById(
-                "commentInputField"
-            ) as HTMLTextAreaElement
-        ).placeholder =
-            "善语结善缘，恶语伤人心...";
-
-
-
-
-
-
-        loadTwikooComments();
-
-
-
-
-
-    }catch(e){
-
-
-        console.error(
-            "发布评论失败",
-            e
-        );
-
-
-
-        showToast(
-            "评论发布失败"
-        );
-
-
-
-    }finally{
-
-
-        sendCommentBtn?.removeAttribute(
-            "disabled"
-        );
-
-
-    }
-
+    return div.innerHTML;
 
 }
 
@@ -630,39 +1063,27 @@ async function sendComment(){
 
 
 
-
-
-
-/*
-========================================================
-加载评论列表
-保持你的磨砂 UI
-只读取 Twikoo 数据
-========================================================
-*/
+/* ================================================================
+加载 Twikoo 评论数据
+只填充自己的磨砂列表
+================================================================ */
 
 
 async function loadTwikooComments(){
-
 
     try{
 
 
         const comments =
-            await getTwikooComments();
-
+            await fetchComments();
 
 
 
         if(
             !commentListScroll
         ){
-
             return;
-
         }
-
-
 
 
 
@@ -671,23 +1092,20 @@ async function loadTwikooComments(){
 
 
 
+        if(commentCount){
 
+            commentCount.innerText =
+                String(
+                    comments.length
+                );
 
-        let count =
-            0;
-
+        }
 
 
 
 
         comments.forEach(
             (item:any)=>{
-
-
-
-                count++;
-
-
 
 
                 const node =
@@ -702,21 +1120,12 @@ async function loadTwikooComments(){
 
 
 
-
-
-
                 node.innerHTML =
                 `
-
                 <img
-                    src="
-                    https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
-                        item.nick || "user"
-                    )}
-                    "
                     class="comment-avatar"
+                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(item.nick || "user")}"
                 >
-
 
 
                 <div class="comment-content-box">
@@ -724,9 +1133,7 @@ async function loadTwikooComments(){
 
                     <div class="comment-user-name">
 
-                        ${escapeHtml(
-                            item.nick || ""
-                        )}
+                        ${escapeHtml(item.nick || "")}
 
                     </div>
 
@@ -734,19 +1141,13 @@ async function loadTwikooComments(){
 
                     <div class="comment-text">
 
-                        ${escapeHtml(
-                            item.comment || ""
-                        )}
+                        ${escapeHtml(item.comment || "")}
 
                     </div>
 
 
-
                 </div>
-
-
                 `;
-
 
 
 
@@ -755,38 +1156,18 @@ async function loadTwikooComments(){
                 );
 
 
-
             }
         );
 
 
-
-
-
-        if(
-            commentCount
-        ){
-
-            commentCount.innerText =
-                String(count);
-
-        }
-
-
-
-
-
-    }catch(e){
-
+    }catch(err){
 
         console.error(
-            "评论加载失败",
-            e
+            "加载评论失败",
+            err
         );
 
-
     }
-
 
 }
 
@@ -794,87 +1175,34 @@ async function loadTwikooComments(){
 
 
 
-/*
-打开评论页面时自动刷新
-*/
+/* 发布评论 */
 
-commentBtn?.addEventListener(
+
+sendCommentBtn?.addEventListener(
     "click",
-    ()=>{
-
-        setTimeout(
-            ()=>{
-
-                loadTwikooComments();
-
-            },
-            650
-        );
-
-    }
-);
-/*
-========================================================
-17. Twikoo启动补充
-========================================================
-
-注意：
-这里不要调用 twikoo 官方渲染。
-
-你的 CommentPage.astro 里面：
-
-<div id="hidden-twikoo"></div>
-
-只作为隐藏通信节点。
+    async ()=>{
 
 
-========================================================
-*/
-
-document.addEventListener(
-    "DOMContentLoaded",
-    ()=>{
-
-
-        /*
-        确保 Twikoo 已初始化
-        */
-
-        setTimeout(
-            ()=>{
-
-                initTwikoo();
-
-            },
-            300
-        );
+        const name =
+            commentNameField?.value.trim() || "";
 
 
 
-    }
-);
+        const email =
+            commentEmailField?.value.trim() || "";
 
 
 
+        const content =
+            commentInputField?.value.trim() || "";
 
 
 
+        if(!name){
 
-/*
-========================================================
-18. ESC关闭优化
-========================================================
-*/
-
-
-document.addEventListener(
-    "keydown",
-    (e)=>{
-
-
-        if(
-            e.key !== "Escape"
-        ){
+            showToast(
+                "请输入昵称"
+            );
 
             return;
 
@@ -882,14 +1210,11 @@ document.addEventListener(
 
 
 
-        if(
-            commentPageOverlay &&
-            commentPageOverlay.classList.contains(
-                "active"
-            )
-        ){
+        if(!email){
 
-            closeCommentPage();
+            showToast(
+                "请输入邮箱"
+            );
 
             return;
 
@@ -897,187 +1222,71 @@ document.addEventListener(
 
 
 
+        if(!content){
 
-        if(
-            overlay &&
-            overlay.classList.contains(
-                "active"
-            )
-        ){
+            showToast(
+                "请输入评论内容"
+            );
 
-            closeArticle();
+            return;
 
         }
 
 
-    }
-);
+
+        try{
+
+
+            await submitComment({
+
+                nick:name,
+
+                mail:email,
+
+                comment:content
+
+            });
 
 
 
-
-
-
-
-
-/*
-========================================================
-19. Astro事件绑定
-========================================================
-*/
-
-
-document
-.querySelectorAll(
-    ".post-card"
-)
-.forEach(
-    (card)=>{
-
-
-        const open = ()=>{
-
-
-            const el =
-                card as HTMLElement;
-
-
-
-            openArticle(
-
-                el,
-
-
-                el.dataset.title || "",
-
-
-                el.dataset.date || "",
-
-
-                el.dataset.category || "",
-
-
-                el.dataset.content || ""
-
+            showToast(
+                "评论发布成功"
             );
 
 
-        };
 
+            if(commentInputField){
 
-
-
-
-        card.addEventListener(
-            "click",
-            open
-        );
-
-
-
-
-
-        card.addEventListener(
-            "keydown",
-            (event)=>{
-
-
-                const e =
-                    event as KeyboardEvent;
-
-
-
-                if(
-                    e.key==="Enter" ||
-                    e.key===" "
-                ){
-
-                    e.preventDefault();
-
-
-                    open();
-
-
-                }
-
+                commentInputField.value =
+                    "";
 
             }
-        );
+
+
+
+            loadTwikooComments();
+
+
+
+        }catch(e){
+
+
+            console.error(
+                e
+            );
+
+
+            showToast(
+                "评论发布失败"
+            );
+
+
+        }
 
 
     }
 );
 
-
-
-
-
-
-
-
-/*
-========================================================
-20. 图片 fallback
-========================================================
-*/
-
-
-document
-.querySelectorAll(
-    "img[data-fallback]"
-)
-.forEach(
-    (img)=>{
-
-
-        img.addEventListener(
-            "error",
-            ()=>{
-
-
-                const element =
-                    img as HTMLImageElement;
-
-
-
-                const fallback =
-                    element.dataset.fallback;
-
-
-
-
-                if(
-                    fallback &&
-                    element.src !== fallback
-                ){
-
-                    element.src =
-                        fallback;
-
-                }
-
-
-            },
-            {
-                once:true
-            }
-        );
-
-
-    }
-);
-
-
-
-
-
-
-
-/*
-========================================================
-21. 首次加载评论
-========================================================
-*/
 
 
 loadTwikooComments();
