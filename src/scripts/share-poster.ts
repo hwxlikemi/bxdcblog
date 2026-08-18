@@ -1,11 +1,22 @@
+// src/scripts/share-poster.ts
+
 const AUTHOR_NAME = "boxueduocai";
-const AUTHOR_AVATAR = "/assets/images/avatar.jpg";
+const AUTHOR_AVATAR = "/assets/images/b120123.png";
 const AUTHOR_DESCRIPTION = "后来烟雨皆散尽，无人撑伞一人行";
 
 const SHARE_POSTER_STYLE_ID = "share-poster-style";
 const SHARE_POSTER_OVERLAY_ID = "sharePosterOverlay";
 
 let shareOriginButton: HTMLElement | null = null;
+
+let currentPosterCanvas: HTMLCanvasElement | null = null;
+let currentPosterTitle = "文章分享";
+let currentPosterUrl = window.location.href;
+
+
+/* =========================================================
+ * 样式
+ * ========================================================= */
 
 function injectStyles() {
     if (document.getElementById(SHARE_POSTER_STYLE_ID)) {
@@ -20,109 +31,177 @@ function injectStyles() {
         #sharePosterOverlay {
             position: fixed;
             inset: 0;
+
             z-index: 99999;
+
             display: flex;
             align-items: center;
             justify-content: center;
+
             padding: 20px;
-            background: rgba(15, 23, 42, 0.48);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
+
+            background: rgba(15, 23, 42, 0.46);
+
+            backdrop-filter: blur(0);
+            -webkit-backdrop-filter: blur(0);
 
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
 
-            /*
-             * 背景本身只淡入，
-             * 海报主体负责“从按钮飞出来”
-             */
             transition:
-                opacity 300ms ease,
-                visibility 300ms ease;
+                opacity 420ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    ),
+                backdrop-filter 700ms ease,
+                -webkit-backdrop-filter 700ms ease;
         }
 
         #sharePosterOverlay.active {
             opacity: 1;
             visibility: visible;
             pointer-events: auto;
+
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
         }
+
+
+        /* =====================================================
+         * 海报主体
+         * ===================================================== */
 
         .share-poster-modal {
             position: relative;
 
             width: min(430px, 100%);
             max-height: calc(100vh - 40px);
+
             overflow-y: auto;
 
             padding: 15px;
 
             border-radius: 26px;
 
-            background: rgba(255, 255, 255, 0.86);
+            background: rgba(255, 255, 255, 0.92);
 
             border: 1px solid rgba(255, 255, 255, 0.72);
 
             box-shadow:
-                0 30px 80px rgba(15, 23, 42, 0.24),
-                0 8px 30px rgba(15, 23, 42, 0.12);
+                0 35px 100px rgba(15, 23, 42, 0.28),
+                0 10px 35px rgba(15, 23, 42, 0.14);
 
-            /*
-             * 初始值由 JS 动态设置：
-             *
-             * transform:
-             * translate(...)
-             * scale(...)
-             *
-             * 从分享按钮位置进入
-             */
             transform-origin: center center;
 
+            transform:
+                translate3d(0, 0, 0)
+                scale(1);
+
+            opacity: 1;
+
+            filter: blur(0);
+
+            clip-path:
+                inset(
+                    0 0 0 0
+                    round 26px
+                );
+
+            will-change:
+                transform,
+                opacity,
+                filter,
+                border-radius,
+                clip-path;
+
+            backface-visibility: hidden;
+
+            -webkit-backface-visibility: hidden;
+
             transition:
-                transform 520ms cubic-bezier(0.16, 1, 0.3, 1),
-                opacity 360ms ease;
+                transform 680ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    ),
+                opacity 420ms ease,
+                filter 560ms ease,
+                clip-path 680ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    ),
+                border-radius 680ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    );
         }
 
-        /*
-         * 海报关闭时不需要改变布局，
-         * JS 会动态设置反向 transform。
-         */
+
+        /* =====================================================
+         * Header
+         * ===================================================== */
 
         .share-poster-header {
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
+
             gap: 12px;
+
             padding: 3px 3px 12px;
         }
 
         .share-poster-header-title {
             font-size: 1rem;
+
             font-weight: 700;
+
             color: #0f172a;
         }
 
         .share-poster-header-subtitle {
             margin-top: 3px;
+
             font-size: 0.72rem;
+
             color: #64748b;
         }
 
         .share-poster-close {
             width: 36px;
             height: 36px;
+
             flex: 0 0 36px;
 
             border: 0;
+
             border-radius: 50%;
 
-            background: rgba(15, 23, 42, 0.07);
+            background:
+                rgba(15, 23, 42, 0.07);
+
             color: #334155;
 
             cursor: pointer;
 
             display: flex;
+
             align-items: center;
+
             justify-content: center;
 
             font-size: 0.95rem;
@@ -134,11 +213,19 @@ function injectStyles() {
 
         .share-poster-close:hover {
             transform: rotate(90deg);
-            background: rgba(15, 23, 42, 0.12);
+
+            background:
+                rgba(15, 23, 42, 0.12);
         }
+
+
+        /* =====================================================
+         * Preview
+         * ===================================================== */
 
         .share-poster-preview-wrap {
             display: flex;
+
             justify-content: center;
 
             width: 100%;
@@ -155,6 +242,16 @@ function injectStyles() {
                 );
         }
 
+        .share-poster-preview-container {
+            position: relative;
+
+            width: 100%;
+
+            display: flex;
+
+            justify-content: center;
+        }
+
         #sharePosterPreview {
             display: block;
 
@@ -165,13 +262,77 @@ function injectStyles() {
             border-radius: 18px;
 
             box-shadow:
-                0 16px 35px rgba(15, 23, 42, 0.15);
+                0 16px 35px
+                rgba(15, 23, 42, 0.15);
         }
+
+
+        /* =====================================================
+         * Loading
+         * ===================================================== */
+
+        .share-poster-loading {
+            position: absolute;
+
+            inset: 0;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            border-radius: 18px;
+
+            background:
+                rgba(255, 255, 255, 0.72);
+
+            color: #334155;
+
+            font-size: 0.85rem;
+
+            font-weight: 600;
+
+            backdrop-filter: blur(8px);
+
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .share-poster-spinner {
+            width: 20px;
+            height: 20px;
+
+            border: 2px solid
+                rgba(15, 23, 42, 0.12);
+
+            border-top-color:
+                #0284c7;
+
+            border-radius: 50%;
+
+            animation:
+                sharePosterSpin
+                700ms
+                linear
+                infinite;
+        }
+
+        @keyframes sharePosterSpin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+
+        /* =====================================================
+         * Buttons
+         * ===================================================== */
 
         .share-poster-actions {
             display: grid;
 
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns:
+                1fr 1fr;
 
             gap: 9px;
 
@@ -182,15 +343,19 @@ function injectStyles() {
             height: 44px;
 
             border: 0;
+
             border-radius: 14px;
 
             cursor: pointer;
 
             font-size: 0.88rem;
+
             font-weight: 700;
 
             display: flex;
+
             align-items: center;
+
             justify-content: center;
 
             gap: 8px;
@@ -210,85 +375,33 @@ function injectStyles() {
 
         .share-poster-action:disabled {
             opacity: 0.45;
+
             cursor: default;
+
             transform: none;
         }
 
         .share-poster-save {
             background: #0284c7;
+
             color: white;
 
             box-shadow:
-                0 8px 20px rgba(2, 132, 199, 0.22);
+                0 8px 20px
+                rgba(2, 132, 199, 0.22);
         }
 
         .share-poster-native {
-            background: rgba(15, 23, 42, 0.07);
+            background:
+                rgba(15, 23, 42, 0.07);
+
             color: #0f172a;
         }
 
-        .share-poster-loading {
-            position: absolute;
 
-            inset: 0;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            border-radius: 18px;
-
-            background: rgba(255, 255, 255, 0.72);
-
-            color: #334155;
-
-            font-size: 0.85rem;
-            font-weight: 600;
-
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-        }
-
-        .share-poster-preview-container {
-            position: relative;
-
-            width: 100%;
-
-            display: flex;
-            justify-content: center;
-        }
-
-        .share-poster-spinner {
-            width: 20px;
-            height: 20px;
-
-            border: 2px solid rgba(15, 23, 42, 0.12);
-
-            border-top-color: #0284c7;
-
-            border-radius: 50%;
-
-            animation:
-                sharePosterSpin 700ms linear infinite;
-        }
-
-        @keyframes sharePosterSpin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /*
-         * 点击按钮时，
-         * 按钮本身稍微缩一下，
-         * 和海报动画形成连续效果。
-         */
-        .share-poster-origin-active {
-            transform: scale(0.88) !important;
-            transition:
-                transform 180ms
-                cubic-bezier(0.16, 1, 0.3, 1) !important;
-        }
+        /* =====================================================
+         * 移动端
+         * ===================================================== */
 
         @media (max-width: 520px) {
             #sharePosterOverlay {
@@ -297,11 +410,31 @@ function injectStyles() {
 
             .share-poster-modal {
                 padding: 11px;
+
                 border-radius: 23px;
+
+                max-height:
+                    calc(100vh - 20px);
             }
 
             .share-poster-actions {
                 grid-template-columns: 1fr;
+            }
+        }
+
+
+        /* =====================================================
+         * 减少动画模式
+         * ===================================================== */
+
+        @media (prefers-reduced-motion: reduce) {
+            #sharePosterOverlay {
+                transition: opacity 150ms ease;
+            }
+
+            .share-poster-modal {
+                transition:
+                    opacity 150ms ease;
             }
         }
     `;
@@ -309,273 +442,43 @@ function injectStyles() {
     document.head.appendChild(style);
 }
 
-/*
- * 获取分享按钮
- */
-function getShareButton(): HTMLElement | null {
-    return document.querySelector(
-        "#shareBtn",
-    );
-}
 
-/*
- * 获取海报 Modal
- */
-function getPosterModal(
-    overlay: HTMLElement,
-): HTMLElement {
-    return overlay.querySelector(
-        ".share-poster-modal",
-    ) as HTMLElement;
-}
+/* =========================================================
+ * Canvas 工具
+ * ========================================================= */
 
-/*
- * 根据分享按钮的位置，
- * 计算海报应该从哪里飞出来。
- *
- * 返回：
- *
- * x = 按钮中心相对于屏幕中心的偏移
- * y = 按钮中心相对于屏幕中心的偏移
- */
-function getOriginTransform(
-    button: HTMLElement,
-    modal: HTMLElement,
-) {
-    const buttonRect =
-        button.getBoundingClientRect();
-
-    const modalRect =
-        modal.getBoundingClientRect();
-
-    const buttonCenterX =
-        buttonRect.left +
-        buttonRect.width / 2;
-
-    const buttonCenterY =
-        buttonRect.top +
-        buttonRect.height / 2;
-
-    const modalCenterX =
-        modalRect.left +
-        modalRect.width / 2;
-
-    const modalCenterY =
-        modalRect.top +
-        modalRect.height / 2;
-
-    const x =
-        buttonCenterX -
-        modalCenterX;
-
-    const y =
-        buttonCenterY -
-        modalCenterY;
-
-    return {
-        x,
-        y,
-    };
-}
-
-/*
- * 打开动画
- *
- * 1. 先把 Modal 放到按钮位置
- * 2. scale(0.05)
- * 3. 再恢复到中心 scale(1)
- */
-function playOpenAnimation(
-    overlay: HTMLElement,
-    button: HTMLElement,
-) {
-    const modal =
-        getPosterModal(overlay);
-
-    /*
-     * 先让 Modal 出现在页面，
-     * 这样才能获取真实尺寸。
-     */
-    overlay.classList.add(
-        "active",
-    );
-
-    /*
-     * 禁止立即过渡，
-     * 设置初始位置。
-     */
-    modal.style.transition =
-        "none";
-
-    modal.style.opacity = "0";
-
-    const origin =
-        getOriginTransform(
-            button,
-            modal,
-        );
-
-    /*
-     * 从按钮位置开始。
-     */
-    modal.style.transform =
-        `
-        translate(
-            ${origin.x}px,
-            ${origin.y}px
-        )
-        scale(0.08)
-        `;
-
-    /*
-     * 强制浏览器提交初始状态。
-     */
-    modal.getBoundingClientRect();
-
-    /*
-     * 下一帧开始动画。
-     */
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            modal.style.transition = `
-                transform 560ms
-                cubic-bezier(0.16, 1, 0.3, 1),
-                opacity 260ms ease
-            `;
-
-            modal.style.opacity =
-                "1";
-
-            modal.style.transform =
-                `
-                translate(0, 0)
-                scale(1)
-                `;
-        });
-    });
-
-    /*
-     * 分享按钮缩小。
-     */
-    button.classList.add(
-        "share-poster-origin-active",
-    );
-}
-
-/*
- * 关闭动画
- *
- * 与打开完全相反：
- *
- * 中央
- * ↓
- * 缩小
- * ↓
- * 飞回按钮
- */
-function playCloseAnimation(
-    overlay: HTMLElement,
-    button: HTMLElement | null,
-) {
-    const modal =
-        getPosterModal(overlay);
-
-    if (!button) {
-        modal.style.opacity =
-            "0";
-
-        overlay.classList.remove(
-            "active",
-        );
-
-        return;
-    }
-
-    const origin =
-        getOriginTransform(
-            button,
-            modal,
-        );
-
-    modal.style.transition = `
-        transform 460ms
-        cubic-bezier(0.4, 0, 1, 1),
-        opacity 300ms ease
-    `;
-
-    modal.style.transform =
-        `
-        translate(
-            ${origin.x}px,
-            ${origin.y}px
-        )
-        scale(0.08)
-        `;
-
-    modal.style.opacity =
-        "0";
-
-    button.classList.remove(
-        "share-poster-origin-active",
-    );
-
-    window.setTimeout(() => {
-        overlay.classList.remove(
-            "active",
-        );
-
-        /*
-         * 清除内联状态，
-         * 防止下一次打开出现位置错误。
-         */
-        modal.style.transition =
-            "";
-
-        modal.style.transform =
-            "";
-
-        modal.style.opacity =
-            "";
-    }, 470);
-}
-
-function cleanText(
-    text: string,
-) {
+function cleanText(text: string) {
     return text
         .replace(/\s+/g, " ")
         .trim();
 }
+
 
 function truncateText(
     ctx: CanvasRenderingContext2D,
     text: string,
     maxWidth: number,
 ) {
-    const clean =
-        cleanText(text);
+    const clean = cleanText(text);
 
     if (
-        ctx.measureText(clean)
-            .width <= maxWidth
+        ctx.measureText(clean).width <=
+        maxWidth
     ) {
         return clean;
     }
 
     let result = "";
 
-    for (
-        const char of clean
-    ) {
+    for (const char of clean) {
         const next =
             result +
             char +
             "...";
 
         if (
-            ctx.measureText(
-                next,
-            ).width > maxWidth
+            ctx.measureText(next).width >
+            maxWidth
         ) {
             break;
         }
@@ -586,6 +489,7 @@ function truncateText(
     return result + "...";
 }
 
+
 function roundedRect(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -594,12 +498,11 @@ function roundedRect(
     height: number,
     radius: number,
 ) {
-    const r =
-        Math.min(
-            radius,
-            width / 2,
-            height / 2,
-        );
+    const r = Math.min(
+        radius,
+        width / 2,
+        height / 2,
+    );
 
     ctx.beginPath();
 
@@ -643,6 +546,7 @@ function roundedRect(
     ctx.closePath();
 }
 
+
 function drawCircle(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -660,6 +564,11 @@ function drawCircle(
     );
 }
 
+
+/* =========================================================
+ * 图片加载
+ * ========================================================= */
+
 async function loadImage(
     src: string,
     crossOrigin = true,
@@ -674,20 +583,27 @@ async function loadImage(
                     "anonymous";
             }
 
-            image.onload = () =>
+            image.onload = () => {
                 resolve(image);
+            };
 
-            image.onerror = () =>
+            image.onerror = () => {
                 reject(
                     new Error(
                         `无法加载图片：${src}`,
                     ),
                 );
+            };
 
             image.src = src;
         },
     );
 }
+
+
+/* =========================================================
+ * 默认头像
+ * ========================================================= */
 
 function createInitialAvatar(
     name: string,
@@ -765,6 +681,11 @@ function createInitialAvatar(
 
     return canvas;
 }
+
+
+/* =========================================================
+ * 绘制头像
+ * ========================================================= */
 
 async function drawAvatar(
     ctx: CanvasRenderingContext2D,
@@ -847,6 +768,11 @@ async function drawAvatar(
     ctx.restore();
 }
 
+
+/* =========================================================
+ * QR Code
+ * ========================================================= */
+
 async function loadQrCode(
     url: string,
 ): Promise<HTMLImageElement> {
@@ -868,6 +794,11 @@ async function loadQrCode(
         true,
     );
 }
+
+
+/* =========================================================
+ * 标题换行
+ * ========================================================= */
 
 function drawWrappedTitle(
     ctx: CanvasRenderingContext2D,
@@ -892,9 +823,8 @@ function drawWrappedTitle(
             current + char;
 
         if (
-            ctx.measureText(
-                test,
-            ).width >
+            ctx.measureText(test)
+                .width >
             maxWidth
         ) {
             lines.push(
@@ -922,8 +852,7 @@ function drawWrappedTitle(
     }
 
     if (
-        lines.length ===
-            maxLines &&
+        lines.length === maxLines &&
         cleanTitle.length >
             lines.join("").length
     ) {
@@ -940,10 +869,7 @@ function drawWrappedTitle(
             last.length > 1
         ) {
             last =
-                last.slice(
-                    0,
-                    -1,
-                );
+                last.slice(0, -1);
         }
 
         lines[
@@ -970,14 +896,21 @@ function drawWrappedTitle(
     return lines.length;
 }
 
+
+/* =========================================================
+ * 创建分享海报
+ * ========================================================= */
+
 async function createSharePoster(
     title: string,
     shareUrl: string,
 ) {
     /*
+     * 海报尺寸
+     *
      * 1080 × 1280
      *
-     * 比之前的 1080 × 1440 更短。
+     * 比传统 1080 × 1440 更短。
      */
     const width = 1080;
     const height = 1280;
@@ -995,9 +928,11 @@ async function createSharePoster(
             "2d",
         )!;
 
-    /*
+
+    /* -----------------------------------------------------
      * 背景
-     */
+     * ----------------------------------------------------- */
+
     const background =
         ctx.createLinearGradient(
             0,
@@ -1031,13 +966,14 @@ async function createSharePoster(
         height,
     );
 
-    /*
+
+    /* -----------------------------------------------------
      * 几何装饰
-     */
+     * ----------------------------------------------------- */
+
     ctx.save();
 
-    ctx.globalAlpha =
-        0.08;
+    ctx.globalAlpha = 0.08;
 
     ctx.fillStyle =
         "#0284c7";
@@ -1109,9 +1045,11 @@ async function createSharePoster(
 
     ctx.restore();
 
-    /*
-     * 品牌
-     */
+
+    /* -----------------------------------------------------
+     * BLOG 标识
+     * ----------------------------------------------------- */
+
     ctx.textAlign =
         "left";
 
@@ -1139,9 +1077,11 @@ async function createSharePoster(
         120,
     );
 
-    /*
-     * 标题
-     */
+
+    /* -----------------------------------------------------
+     * 文章标题
+     * ----------------------------------------------------- */
+
     ctx.fillStyle =
         "#0f172a";
 
@@ -1159,9 +1099,11 @@ async function createSharePoster(
             3,
         );
 
-    /*
+
+    /* -----------------------------------------------------
      * 分隔线
-     */
+     * ----------------------------------------------------- */
+
     const separatorY =
         235 +
         titleLines * 78 +
@@ -1186,9 +1128,11 @@ async function createSharePoster(
 
     ctx.stroke();
 
-    /*
+
+    /* -----------------------------------------------------
      * 作者
-     */
+     * ----------------------------------------------------- */
+
     const avatarSize = 82;
 
     const avatarX = 82;
@@ -1240,9 +1184,11 @@ async function createSharePoster(
         avatarY + 64,
     );
 
-    /*
+
+    /* -----------------------------------------------------
      * QR Code
-     */
+     * ----------------------------------------------------- */
+
     const qrSize = 360;
 
     const qrX =
@@ -1312,9 +1258,11 @@ async function createSharePoster(
             "left";
     }
 
-    /*
-     * QR Code 文字
-     */
+
+    /* -----------------------------------------------------
+     * QR Code 文案
+     * ----------------------------------------------------- */
+
     ctx.textAlign =
         "center";
 
@@ -1358,9 +1306,11 @@ async function createSharePoster(
             86,
     );
 
-    /*
+
+    /* -----------------------------------------------------
      * 底部
-     */
+     * ----------------------------------------------------- */
+
     ctx.textAlign =
         "left";
 
@@ -1415,6 +1365,11 @@ async function createSharePoster(
     return canvas;
 }
 
+
+/* =========================================================
+ * Overlay
+ * ========================================================= */
+
 function getPosterOverlay() {
     let overlay =
         document.getElementById(
@@ -1435,7 +1390,9 @@ function getPosterOverlay() {
 
     overlay.innerHTML = `
         <div class="share-poster-modal">
+
             <div class="share-poster-header">
+
                 <div>
                     <div class="share-poster-header-title">
                         分享文章
@@ -1454,10 +1411,16 @@ function getPosterOverlay() {
                 >
                     <i class="fa-solid fa-xmark"></i>
                 </button>
+
             </div>
 
+
             <div class="share-poster-preview-wrap">
-                <div class="share-poster-preview-container">
+
+                <div
+                    class="share-poster-preview-container"
+                >
+
                     <canvas
                         id="sharePosterPreview"
                     ></canvas>
@@ -1466,36 +1429,62 @@ function getPosterOverlay() {
                         class="share-poster-loading"
                         id="sharePosterLoading"
                     >
-                        <div class="share-poster-spinner"></div>
+                        <div
+                            class="share-poster-spinner"
+                        ></div>
                     </div>
+
                 </div>
+
             </div>
 
+
             <div class="share-poster-actions">
+
                 <button
                     type="button"
-                    class="share-poster-action share-poster-save"
+                    class="
+                        share-poster-action
+                        share-poster-save
+                    "
                     id="sharePosterSave"
                 >
-                    <i class="fa-solid fa-download"></i>
+                    <i
+                        class="fa-solid fa-download"
+                    ></i>
+
                     保存图片
                 </button>
 
+
                 <button
                     type="button"
-                    class="share-poster-action share-poster-native"
+                    class="
+                        share-poster-action
+                        share-poster-native
+                    "
                     id="sharePosterNative"
                 >
-                    <i class="fa-solid fa-share-nodes"></i>
+                    <i
+                        class="fa-solid fa-share-nodes"
+                    ></i>
+
                     分享
                 </button>
+
             </div>
+
         </div>
     `;
 
     document.body.appendChild(
         overlay,
     );
+
+
+    /* -----------------------------------------------------
+     * 关闭按钮
+     * ----------------------------------------------------- */
 
     const closeButton =
         overlay.querySelector(
@@ -1504,13 +1493,22 @@ function getPosterOverlay() {
 
     closeButton.addEventListener(
         "click",
-        () => {
+        (event) => {
+            event.preventDefault();
+
+            event.stopPropagation();
+
             playCloseAnimation(
                 overlay!,
                 shareOriginButton,
             );
         },
     );
+
+
+    /* -----------------------------------------------------
+     * 点击背景关闭
+     * ----------------------------------------------------- */
 
     overlay.addEventListener(
         "click",
@@ -1527,9 +1525,11 @@ function getPosterOverlay() {
         },
     );
 
-    /*
-     * ESC 关闭
-     */
+
+    /* -----------------------------------------------------
+     * ESC
+     * ----------------------------------------------------- */
+
     document.addEventListener(
         "keydown",
         (event) => {
@@ -1551,15 +1551,541 @@ function getPosterOverlay() {
     return overlay;
 }
 
-let currentPosterCanvas:
-    HTMLCanvasElement | null =
-        null;
 
-let currentPosterTitle =
-    "文章分享";
+/* =========================================================
+ * 获取动画位移
+ * ========================================================= */
 
-let currentPosterUrl =
-    window.location.href;
+function getOriginTransform(
+    button: HTMLElement,
+    modal: HTMLElement,
+) {
+    const buttonRect =
+        button.getBoundingClientRect();
+
+    const modalRect =
+        modal.getBoundingClientRect();
+
+
+    const buttonCenterX =
+        buttonRect.left +
+        buttonRect.width / 2;
+
+    const buttonCenterY =
+        buttonRect.top +
+        buttonRect.height / 2;
+
+
+    const modalCenterX =
+        modalRect.left +
+        modalRect.width / 2;
+
+    const modalCenterY =
+        modalRect.top +
+        modalRect.height / 2;
+
+
+    return {
+        x:
+            buttonCenterX -
+            modalCenterX,
+
+        y:
+            buttonCenterY -
+            modalCenterY,
+
+        buttonWidth:
+            buttonRect.width,
+
+        buttonHeight:
+            buttonRect.height,
+
+        modalWidth:
+            modalRect.width,
+
+        modalHeight:
+            modalRect.height,
+    };
+}
+
+
+/* =========================================================
+ * 打开动画
+ *
+ * 国产安卓 App 启动风格：
+ *
+ * 分享按钮
+ *     ↓
+ * 小圆角窗口
+ *     ↓
+ * 放大
+ *     ↓
+ * 圆角展开
+ *     ↓
+ * 清晰
+ *     ↓
+ * 完整海报
+ * ========================================================= */
+
+function playOpenAnimation(
+    overlay: HTMLElement,
+    button: HTMLElement,
+) {
+    const modal =
+        getPosterModal(overlay);
+
+
+    /*
+     * 先让 Overlay 出现在 DOM 中。
+     */
+    overlay.classList.add(
+        "active",
+    );
+
+
+    /*
+     * 获取按钮与 Modal 的实际位置。
+     */
+    const origin =
+        getOriginTransform(
+            button,
+            modal,
+        );
+
+
+    /*
+     * 根据按钮大小自动计算起始缩放。
+     */
+    const scaleX =
+        origin.buttonWidth /
+        origin.modalWidth;
+
+    const scaleY =
+        origin.buttonHeight /
+        origin.modalHeight;
+
+    const startScale =
+        Math.max(
+            0.035,
+            Math.min(
+                scaleX,
+                scaleY,
+            ),
+        );
+
+
+    /*
+     * 没有动画偏好时，
+     * 简化动画。
+     */
+    if (
+        window.matchMedia(
+            "(prefers-reduced-motion: reduce)",
+        ).matches
+    ) {
+        modal.style.transition =
+            "none";
+
+        modal.style.transform =
+            "translate3d(0,0,0) scale(1)";
+
+        modal.style.opacity =
+            "1";
+
+        modal.style.filter =
+            "blur(0)";
+
+        modal.style.borderRadius =
+            "26px";
+
+        modal.style.clipPath =
+            "inset(0 0 0 0 round 26px)";
+
+        return;
+    }
+
+
+    /*
+     * 初始状态：
+     *
+     * 从分享按钮内部出现。
+     */
+    modal.style.transition =
+        "none";
+
+    modal.style.opacity =
+        "0.18";
+
+    modal.style.filter =
+        "blur(9px)";
+
+    modal.style.borderRadius =
+        "999px";
+
+    modal.style.clipPath =
+        `
+        inset(
+            43% 43% 43% 43%
+            round 999px
+        )
+        `;
+
+    modal.style.transform =
+        `
+        translate3d(
+            ${origin.x}px,
+            ${origin.y}px,
+            0
+        )
+        scale(
+            ${startScale}
+        )
+        `;
+
+
+    /*
+     * 强制提交初始状态。
+     */
+    modal.getBoundingClientRect();
+
+
+    /*
+     * 下一帧开始。
+     */
+    requestAnimationFrame(() => {
+
+        requestAnimationFrame(() => {
+
+            modal.style.transition = `
+                transform
+                    720ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    ),
+
+                opacity
+                    420ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    ),
+
+                filter
+                    560ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    ),
+
+                border-radius
+                    720ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    ),
+
+                clip-path
+                    720ms
+                    cubic-bezier(
+                        0.16,
+                        1,
+                        0.3,
+                        1
+                    )
+            `;
+
+
+            /*
+             * 最终状态。
+             */
+            modal.style.opacity =
+                "1";
+
+            modal.style.filter =
+                "blur(0)";
+
+            modal.style.borderRadius =
+                "26px";
+
+            modal.style.clipPath =
+                `
+                inset(
+                    0 0 0 0
+                    round 26px
+                )
+                `;
+
+            modal.style.transform =
+                `
+                translate3d(
+                    0,
+                    0,
+                    0
+                )
+                scale(1)
+                `;
+
+        });
+
+    });
+
+
+    /*
+     * 原始分享按钮同步缩小。
+     *
+     * 类似 Android App 图标启动时的反馈。
+     */
+    button.style.transition =
+        `
+        transform
+            260ms
+            cubic-bezier(
+                0.16,
+                1,
+                0.3,
+                1
+            ),
+
+        opacity
+            220ms
+            ease
+        `;
+
+    button.style.transform =
+        "scale(0.82)";
+
+    button.style.opacity =
+        "0.65";
+}
+
+
+/* =========================================================
+ * 关闭动画
+ *
+ * 完整海报
+ *     ↓
+ * 模糊
+ *     ↓
+ * 缩小
+ *     ↓
+ * 圆角收拢
+ *     ↓
+ * 回到原来的分享按钮
+ * ========================================================= */
+
+function playCloseAnimation(
+    overlay: HTMLElement,
+    button: HTMLElement | null,
+) {
+    const modal =
+        getPosterModal(overlay);
+
+
+    /*
+     * 如果没有原始按钮，
+     * 就直接关闭。
+     */
+    if (!button) {
+        modal.style.opacity =
+            "0";
+
+        overlay.classList.remove(
+            "active",
+        );
+
+        return;
+    }
+
+
+    /*
+     * 获取当前按钮位置。
+     *
+     * 用户如果在打开海报以后滚动了页面，
+     * 这里依然可以准确回到按钮。
+     */
+    const origin =
+        getOriginTransform(
+            button,
+            modal,
+        );
+
+
+    const scaleX =
+        origin.buttonWidth /
+        origin.modalWidth;
+
+    const scaleY =
+        origin.buttonHeight /
+        origin.modalHeight;
+
+    const endScale =
+        Math.max(
+            0.035,
+            Math.min(
+                scaleX,
+                scaleY,
+            ),
+        );
+
+
+    /*
+     * 无障碍动画模式。
+     */
+    if (
+        window.matchMedia(
+            "(prefers-reduced-motion: reduce)",
+        ).matches
+    ) {
+        overlay.classList.remove(
+            "active",
+        );
+
+        button.style.transform =
+            "scale(1)";
+
+        button.style.opacity =
+            "1";
+
+        return;
+    }
+
+
+    /*
+     * 反向动画。
+     */
+    modal.style.transition = `
+        transform
+            540ms
+            cubic-bezier(
+                0.4,
+                0,
+                1,
+                1
+            ),
+
+        opacity
+            360ms
+            ease,
+
+        filter
+            460ms
+            cubic-bezier(
+                0.4,
+                0,
+                1,
+                1
+            ),
+
+        border-radius
+            540ms
+            cubic-bezier(
+                0.4,
+                0,
+                1,
+                1
+            ),
+
+        clip-path
+            540ms
+            cubic-bezier(
+                0.4,
+                0,
+                1,
+                1
+            )
+    `;
+
+
+    /*
+     * 海报开始缩回。
+     */
+    modal.style.filter =
+        "blur(8px)";
+
+    modal.style.opacity =
+        "0";
+
+    modal.style.borderRadius =
+        "999px";
+
+    modal.style.clipPath =
+        `
+        inset(
+            43% 43% 43% 43%
+            round 999px
+        )
+        `;
+
+    modal.style.transform =
+        `
+        translate3d(
+            ${origin.x}px,
+            ${origin.y}px,
+            0
+        )
+        scale(
+            ${endScale}
+        )
+        `;
+
+
+    /*
+     * 原分享按钮恢复。
+     */
+    button.style.transform =
+        "scale(1)";
+
+    button.style.opacity =
+        "1";
+
+
+    /*
+     * 动画完成后隐藏。
+     */
+    window.setTimeout(() => {
+
+        overlay.classList.remove(
+            "active",
+        );
+
+
+        /*
+         * 清理 Modal 内联样式。
+         */
+        modal.style.transition =
+            "";
+
+        modal.style.transform =
+            "";
+
+        modal.style.opacity =
+            "";
+
+        modal.style.filter =
+            "";
+
+        modal.style.borderRadius =
+            "";
+
+        modal.style.clipPath =
+            "";
+
+    }, 560);
+}
+
+
+/* =========================================================
+ * 打开海报
+ * ========================================================= */
 
 async function openSharePoster(
     button: HTMLElement,
@@ -1569,40 +2095,49 @@ async function openSharePoster(
     shareOriginButton =
         button;
 
+
     const overlay =
         getPosterOverlay();
+
 
     const preview =
         overlay.querySelector(
             "#sharePosterPreview",
         ) as HTMLCanvasElement;
 
+
     const loading =
         overlay.querySelector(
             "#sharePosterLoading",
         ) as HTMLElement;
+
 
     const saveButton =
         overlay.querySelector(
             "#sharePosterSave",
         ) as HTMLButtonElement;
 
+
     const nativeButton =
         overlay.querySelector(
             "#sharePosterNative",
         ) as HTMLButtonElement;
+
 
     const titleElement =
         document.getElementById(
             "viewTitle",
         );
 
+
     const title =
         titleElement?.innerText.trim() ||
         "文章分享";
 
+
     const shareUrl =
         window.location.href;
+
 
     currentPosterTitle =
         title;
@@ -1610,26 +2145,35 @@ async function openSharePoster(
     currentPosterUrl =
         shareUrl;
 
+
+    /*
+     * 每次打开之前清理按钮状态。
+     */
     loading.style.display =
         "flex";
 
     loading.innerHTML = `
-        <div class="share-poster-spinner"></div>
+        <div
+            class="share-poster-spinner"
+        ></div>
     `;
 
-    saveButton.disabled = true;
-    nativeButton.disabled = true;
+
+    saveButton.disabled =
+        true;
+
+    nativeButton.disabled =
+        true;
+
 
     /*
-     * 先生成海报。
-     *
-     * 但这里先执行打开动画，
-     * 让用户看到“从按钮出来”的感觉。
+     * 先播放 App 启动动画。
      */
     playOpenAnimation(
         overlay,
         button,
     );
+
 
     try {
         const canvas =
@@ -1638,8 +2182,10 @@ async function openSharePoster(
                 shareUrl,
             );
 
+
         currentPosterCanvas =
             canvas;
+
 
         preview.width =
             canvas.width;
@@ -1647,10 +2193,12 @@ async function openSharePoster(
         preview.height =
             canvas.height;
 
+
         const previewContext =
             preview.getContext(
                 "2d",
             )!;
+
 
         previewContext.clearRect(
             0,
@@ -1659,45 +2207,67 @@ async function openSharePoster(
             preview.height,
         );
 
+
         previewContext.drawImage(
             canvas,
             0,
             0,
         );
 
+
         loading.style.display =
             "none";
+
 
         saveButton.disabled =
             false;
 
         nativeButton.disabled =
             false;
+
     } catch (error) {
+
         console.error(
             "分享海报生成失败:",
             error,
         );
 
+
         loading.innerHTML = `
-            <div style="
-                text-align:center;
-                line-height:1.7;
-            ">
-                <div style="
-                    font-size:24px;
-                    margin-bottom:6px;
-                ">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
+            <div
+                style="
+                    text-align:center;
+                    line-height:1.7;
+                "
+            >
+
+                <div
+                    style="
+                        font-size:24px;
+                        margin-bottom:6px;
+                    "
+                >
+                    <i
+                        class="
+                            fa-solid
+                            fa-triangle-exclamation
+                        "
+                    ></i>
                 </div>
 
                 <div>
                     海报生成失败
                 </div>
+
             </div>
         `;
     }
 }
+
+
+/* =========================================================
+ * 下载海报
+ * ========================================================= */
 
 function downloadPoster() {
     if (
@@ -1706,10 +2276,12 @@ function downloadPoster() {
         return;
     }
 
+
     const link =
         document.createElement(
             "a",
         );
+
 
     const safeTitle =
         currentPosterTitle
@@ -1717,19 +2289,30 @@ function downloadPoster() {
                 /[\\/:*?"<>|]/g,
                 "",
             )
-            .slice(0, 40) ||
+            .slice(
+                0,
+                40,
+            ) ||
         "文章分享";
+
 
     link.download =
         `${safeTitle}-分享海报.png`;
+
 
     link.href =
         currentPosterCanvas.toDataURL(
             "image/png",
         );
 
+
     link.click();
 }
+
+
+/* =========================================================
+ * 系统分享
+ * ========================================================= */
 
 async function nativeSharePoster() {
     if (
@@ -1738,17 +2321,21 @@ async function nativeSharePoster() {
         return;
     }
 
+
     try {
         const blob =
             await new Promise<Blob | null>(
                 (resolve) => {
+
                     currentPosterCanvas!.toBlob(
                         resolve,
                         "image/png",
                         0.95,
                     );
+
                 },
             );
+
 
         if (!blob) {
             throw new Error(
@@ -1756,15 +2343,21 @@ async function nativeSharePoster() {
             );
         }
 
+
         const file =
             new File(
                 [blob],
                 "分享海报.png",
                 {
-                    type: "image/png",
+                    type:
+                        "image/png",
                 },
             );
 
+
+        /*
+         * 支持图片文件分享。
+         */
         if (
             navigator.share &&
             navigator.canShare &&
@@ -1772,6 +2365,7 @@ async function nativeSharePoster() {
                 files: [file],
             })
         ) {
+
             await navigator.share({
                 title:
                     currentPosterTitle,
@@ -1788,9 +2382,14 @@ async function nativeSharePoster() {
             return;
         }
 
+
+        /*
+         * 只支持普通分享。
+         */
         if (
             navigator.share
         ) {
+
             await navigator.share({
                 title:
                     currentPosterTitle,
@@ -1805,39 +2404,66 @@ async function nativeSharePoster() {
             return;
         }
 
+
+        /*
+         * 浏览器不支持系统分享，
+         * 自动保存。
+         */
         downloadPoster();
+
     } catch (error) {
+
+        /*
+         * 用户主动取消分享，
+         * 不需要提示。
+         */
         if (
-            error instanceof DOMException &&
+            error instanceof
+                DOMException &&
             error.name ===
                 "AbortError"
         ) {
             return;
         }
 
+
         console.error(
             "系统分享失败:",
             error,
         );
 
+
         downloadPoster();
     }
 }
 
+
+/* =========================================================
+ * 绑定按钮
+ * ========================================================= */
+
 function bindSharePosterButtons() {
+
     /*
-     * 捕获阶段拦截原来的分享按钮。
+     * 捕获阶段拦截原来的 #shareBtn。
+     *
+     * 这样不会触发原本的分享逻辑。
      */
     document.addEventListener(
         "click",
         (event) => {
+
             const target =
                 event.target as HTMLElement;
+
 
             const shareButton =
                 target.closest(
                     "#shareBtn",
-                ) as HTMLElement | null;
+                ) as
+                    | HTMLElement
+                    | null;
+
 
             if (
                 !shareButton
@@ -1845,33 +2471,44 @@ function bindSharePosterButtons() {
                 return;
             }
 
+
             event.preventDefault();
 
             event.stopPropagation();
 
             event.stopImmediatePropagation();
 
+
             void openSharePoster(
                 shareButton,
             );
+
         },
         true,
     );
 
+
     /*
-     * 保存 / 系统分享。
+     * 保存图片 / 系统分享。
      */
     document.addEventListener(
         "click",
         (event) => {
+
             const target =
                 event.target as HTMLElement;
 
-            if (
+
+            const saveButton =
                 target.closest(
                     "#sharePosterSave",
-                )
+                );
+
+
+            if (
+                saveButton
             ) {
+
                 event.preventDefault();
 
                 event.stopPropagation();
@@ -1881,26 +2518,40 @@ function bindSharePosterButtons() {
                 return;
             }
 
-            if (
+
+            const nativeButton =
                 target.closest(
                     "#sharePosterNative",
-                )
+                );
+
+
+            if (
+                nativeButton
             ) {
+
                 event.preventDefault();
 
                 event.stopPropagation();
 
                 void nativeSharePoster();
+
             }
+
         },
         true,
     );
 }
 
+
+/* =========================================================
+ * 初始化
+ * ========================================================= */
+
 if (
     document.readyState ===
     "loading"
 ) {
+
     document.addEventListener(
         "DOMContentLoaded",
         bindSharePosterButtons,
@@ -1908,6 +2559,9 @@ if (
             once: true,
         },
     );
+
 } else {
+
     bindSharePosterButtons();
+
 }
