@@ -46,6 +46,14 @@ export const siteConfig = {
   music: {
     defaultTrackIndex: 0,
   },
+  twikoo: {
+    enable: true,
+
+    envId:
+    "https://kwitoo-bxdc.vercel.app/"
+},
 } as const;
+
+
 
 export type SiteConfig = typeof siteConfig;

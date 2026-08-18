@@ -1,5 +1,10 @@
 import { playlist } from "../data/music";
 import { siteConfig } from "../config";
+import {
+    submitComment,
+    fetchComments
+}
+from "./twikoo-api";
 
 /* ================================================================
    1. 动态日历
@@ -1213,128 +1218,6 @@ commentPageBackBtn.addEventListener(
 /* ================================================================
    10. 评论 Emoji
 ================================================================ */
-/* ================================================================
-   11. 图片上传
-================================================================ */
-
-const uploadImgTrigger =
-    document.getElementById(
-        "uploadImgTrigger"
-    );
-
-const imgFileInput =
-    document.getElementById(
-        "imgFileInput"
-    );
-
-const attachmentPreview =
-    document.getElementById(
-        "commentAttachmentPreview"
-    );
-
-const attachmentPreviewImage =
-    document.getElementById(
-        "attachmentPreviewImage"
-    );
-
-const attachmentFileName =
-    document.getElementById(
-        "attachmentFileName"
-    );
-
-const removeAttachmentBtn =
-    document.getElementById(
-        "removeAttachmentBtn"
-    );
-
-
-uploadImgTrigger.addEventListener(
-    "click",
-    () => {
-
-        imgFileInput.click();
-    }
-);
-
-
-imgFileInput.addEventListener(
-    "change",
-    () => {
-
-        if (
-            !imgFileInput.files ||
-            !imgFileInput.files[0]
-        ) {
-            return;
-        }
-
-        const file =
-            imgFileInput.files[0];
-
-        /*
-         * 限制一下图片大小。
-         */
-        if (
-            file.size >
-            10 * 1024 * 1024
-        ) {
-
-            showToast(
-                "图片不能超过 10MB"
-            );
-
-            imgFileInput.value =
-                "";
-
-            return;
-        }
-
-        const fileUrl =
-            URL.createObjectURL(
-                file
-            );
-
-        attachmentPreviewImage.src =
-            fileUrl;
-
-        attachmentFileName.innerText =
-            file.name;
-
-        attachmentPreview.classList.add(
-            "active"
-        );
-
-        showToast(
-            "图片已添加"
-        );
-    }
-);
-
-
-removeAttachmentBtn.addEventListener(
-    "click",
-    () => {
-
-        clearAttachment();
-    }
-);
-
-
-function clearAttachment() {
-
-    imgFileInput.value =
-        "";
-
-    attachmentPreviewImage.src =
-        "";
-
-    attachmentFileName.innerText =
-        "";
-
-    attachmentPreview.classList.remove(
-        "active"
-    );
-}
 
 
 /* ================================================================
@@ -1381,7 +1264,7 @@ function escapeHtml(
 
 
 /* ================================================================
-   14. 发布评论
+   14. 发布评论（Twikoo API）
 ================================================================ */
 
 const sendCommentBtn =
@@ -1410,13 +1293,13 @@ const commentEmailField =
     );
 
 
-sendCommentBtn.addEventListener(
+sendCommentBtn?.addEventListener(
     "click",
     sendComment
 );
 
 
-function sendComment() {
+async function sendComment() {
 
     const val =
         commentInputField.value.trim();
@@ -1464,175 +1347,121 @@ function sendComment() {
     }
 
 
+    try {
 
-    const newNode =
-        document.createElement(
-            "div"
-        );
+        await submitComment({
 
-    newNode.className =
-        "comment-node";
+            nick:name,
+
+            mail:email,
+
+            comment:val
+
+        });
 
 
-    const safeName =
-        escapeHtml(
-            name
-        );
-
-    const safeEmail =
-        escapeHtml(
-            email
-        );
-
-    const safeText =
-        escapeHtml(
-            val
+        showToast(
+            "评论发布成功！"
         );
 
 
-    let imgHtml =
-        "";
+        commentInputField.value = "";
 
-    if (
-        imgFileInput.files &&
-        imgFileInput.files[0]
-    ) {
+        commentInputField.placeholder =
+            "善语结善缘，恶语伤人心...";
 
-        const fileUrl =
-            URL.createObjectURL(
-                imgFileInput.files[0]
-            );
 
-        imgHtml =
-            `
-            <br>
-            <img
-                src="${fileUrl}"
-                style="
-                    max-width:180px;
-                    max-height:180px;
-                    border-radius:12px;
-                    margin-top:8px;
-                    object-fit:cover;
-                "
-            >
-            `;
+        currentReplyTarget =
+            null;
+
+
+        loadTwikooComments();
+
+
+    } catch(e) {
+
+        showToast(
+            "评论发布失败"
+        );
+
     }
 
-
-    const replyHtml =
-        currentReplyTarget
-            ? `
-                <span
-                    style="
-                        font-size:0.75rem;
-                        color:var(--text-secondary);
-                        margin-left:5px;
-                    "
-                >
-                    回复 @${escapeHtml(
-                        currentReplyTarget
-                    )}
-                </span>
-              `
-            : "";
+}
 
 
-    newNode.innerHTML =
-        `
-        <img
-            src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}"
-            class="comment-avatar"
-        >
 
-        <div class="comment-content-box">
+/* ================================================================
+   Twikoo 评论加载
+================================================================ */
 
-            <div class="comment-user-name">
-                ${safeName}
+async function loadTwikooComments(){
 
-                ${replyHtml}
+    try {
 
-                ${
-                    safeEmail
-                        ? `
-                        <span class="comment-user-email">
-                            ${safeEmail}
-                        </span>
-                        `
-                        : ""
-                }
+        const comments =
+            await fetchComments();
 
-            </div>
 
-            <div class="comment-text">
-                ${safeText}
-                ${imgHtml}
-            </div>
+        if(!commentListScroll){
+            return;
+        }
 
-            <div class="comment-bottom-meta">
 
-                <span>
-                    刚刚
-                </span>
+        commentListScroll.innerHTML =
+            "";
 
-                <span
-                    class="comment-reply-btn"
-                    onclick="prepareReply('${safeName.replace(/'/g, "\\'")}')"
-                >
-                    回复
-                </span>
 
-                <span
-                    class="comment-like-icon"
-                    onclick="toggleCommentLike(this)"
+        comments.forEach(
+            item => {
+
+                const node =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                node.className =
+                    "comment-node";
+
+
+                node.innerHTML =
+                `
+                <img
+                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(item.nick || "user")}"
+                    class="comment-avatar"
                 >
 
-                    <i class="fa-regular fa-heart"></i>
+                <div class="comment-content-box">
 
-                    <span class="c-like-num">
-                        0
-                    </span>
+                    <div class="comment-user-name">
+                        ${escapeHtml(item.nick || "")}
+                    </div>
 
-                </span>
+                    <div class="comment-text">
+                        ${escapeHtml(item.comment || "")}
+                    </div>
 
-            </div>
-
-        </div>
-        `;
-
-
-    commentListScroll.prepend(
-        newNode
-    );
+                </div>
+                `;
 
 
-    /*
-     * 清理输入。
-     */
-    commentInputField.value =
-        "";
+                commentListScroll.appendChild(
+                    node
+                );
 
-    commentInputField.placeholder =
-        "善语结善缘，恶语伤人心...";
-
-    clearAttachment();
-
-    currentReplyTarget =
-        null;
+            }
+        );
 
 
-    let count =
-        parseInt(
-            commentCount.innerText
-        ) || 0;
+    } catch(e) {
 
-    commentCount.innerText =
-        count + 1;
+        console.error(
+            "Twikoo加载失败",
+            e
+        );
 
+    }
 
-    showToast(
-        "评论发布成功！"
-    );
 }
 
 
@@ -1653,6 +1482,7 @@ function toggleCommentLike(
         parseInt(
             numEl.innerText
         ) || 0;
+
 
 
     if (
