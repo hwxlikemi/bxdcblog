@@ -1,8 +1,9 @@
 import { siteConfig } from "../config";
 
 
+
 const TWIKOO_API =
-    siteConfig.twikoo.envId;
+    siteConfig.twikoo.envId.replace(/\/$/, "");
 
 
 /**

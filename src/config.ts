@@ -50,7 +50,7 @@ export const siteConfig = {
     enable: true,
 
     envId:
-    "https://kwitoo-bxdc.vercel.app/"
+    "https://kwitoo-bxdc.vercel.app"
 },
 } as const;
 
