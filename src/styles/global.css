@@ -491,6 +491,37 @@
             margin-bottom: 8px;
         }
 
+        .post-category-link {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .post-category-link:hover {
+            color: var(--accent-color);
+        }
+
+        .post-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .post-tag {
+            font-size: 0.72rem;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: rgba(2, 132, 199, 0.1);
+            color: var(--accent-color);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .post-tag:hover {
+            background: rgba(2, 132, 199, 0.2);
+        }
+
         .post-excerpt {
             font-size: 0.85rem;
             color: var(--text-secondary);
@@ -809,15 +840,10 @@
         }
 
         /*
-         * 文章打开以后，原页面悬浮音乐按钮也隐藏。
+         * 文章打开以后，悬浮音乐按钮上移到互动栏上方，保持右下角区域。
          */
         body.article-mode .floating-controls {
-            opacity: 0;
-            transform:
-                translate3d(30px, 0, 0)
-                scale(0.85);
-
-            pointer-events: none;
+            bottom: 100px;
         }
 
         .float-btn {
@@ -1228,17 +1254,17 @@
         }
 
         /* =========================================================
-           18. 文章右侧点赞 / 评论 / 分享
+           18. 文章右下角 评论 / 分享
         ========================================================= */
 
         .article-action-bar {
         position: fixed;
         right: 30px;
-        top: 165px;
+        bottom: 30px;
 
         display: flex;
-        flex-direction: column;
-        gap: 14px;
+        flex-direction: row;
+        gap: 12px;
 
         align-items: center;
 
@@ -1247,7 +1273,7 @@
         opacity: 0;
 
         transform:
-        translate3d(0,-8px,0)
+        translate3d(0,12px,0)
         scale(0.96);
 
         transition:
@@ -1277,127 +1303,6 @@
 
         justify-content: center;
 }
-
-        .action-btn-item.liked .glass-circle-btn {
-            color:
-                var(--like-red);
-        }
-
-        .action-btn-item.liked .glass-circle-btn i {
-            animation:
-                heartPop 300ms var(--ease-fluid);
-        }
-
-        @keyframes heartPop {
-            0% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.35);
-            }
-
-            100% {
-                transform: scale(1);
-            }
-        }
-
-        /* =========================================================
-           19. 点赞人列表
-        ========================================================= */
-
-        .likers-popover {
-            position: absolute;
-
-            right: 66px;
-            bottom: 0;
-
-            width: 220px;
-
-            background:
-                rgba(255,255,255,0.85);
-
-            backdrop-filter:
-                blur(20px);
-
-            -webkit-backdrop-filter:
-                blur(20px);
-
-            border:
-                1px solid
-                var(--glass-border);
-
-            border-radius: 18px;
-
-            padding: 12px;
-
-            box-shadow:
-                var(--glass-shadow);
-
-            opacity: 0;
-            visibility: hidden;
-
-            transform:
-                translateX(10px)
-                scale(0.9);
-
-            transition:
-                all 220ms var(--ease-fluid);
-
-            z-index: 10005;
-        }
-
-        .likers-popover.active {
-            opacity: 1;
-            visibility: visible;
-
-            transform:
-                translateX(0)
-                scale(1);
-        }
-
-        .likers-title {
-            font-size: 0.8rem;
-            font-weight: 700;
-
-            color:
-                var(--text-secondary);
-
-            margin-bottom: 8px;
-
-            border-bottom:
-                1px solid
-                rgba(0,0,0,0.08);
-
-            padding-bottom: 4px;
-        }
-
-        .likers-list {
-            display: flex;
-            flex-direction: column;
-
-            gap: 6px;
-
-            max-height: 120px;
-
-            overflow-y: auto;
-        }
-
-        .liker-item {
-            display: flex;
-            align-items: center;
-
-            gap: 8px;
-
-            font-size: 0.78rem;
-        }
-
-        .liker-avatar {
-            width: 22px;
-            height: 22px;
-
-            border-radius: 50%;
-        }
 
         /* =========================================================
            20. 评论页面
@@ -2246,10 +2151,6 @@
                 right: -8px;
             }
 
-            .likers-popover {
-                right: 58px;
-            }
-
             /* 评论页面 */
 
             .comment-page-container {
@@ -2348,15 +2249,9 @@
            最终交互优化
         ========================================================= */
 
-        /* 文章打开时保持主页布局存在，避免返回时“所有模块消失再出现”。 */
+        /* 文章打开时隐藏侧边大播放器，统一用右下角悬浮音乐按钮。 */
         body.article-mode .large-player-card {
-            position: fixed;
-            right: 30px;
-            top: 225px;
-            width: 300px;
-            z-index: 10002;
-            margin: 0;
-            pointer-events: auto;
+            display: none;
         }
 
         body.article-mode .article-action-bar {
@@ -2393,12 +2288,16 @@
             }
 
             .article-action-bar {
-                right: auto;
-                left: 16px;
+                right: 16px;
+                left: auto;
                 top: auto;
-                bottom: 82px;
+                bottom: 24px;
                 justify-content: center;
-                flex-direction: column;
+                flex-direction: row;
+            }
+
+            body.article-mode .floating-controls {
+                bottom: 84px;
             }
 
             .article-action-bar .glass-circle-btn {

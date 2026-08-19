@@ -7,6 +7,7 @@ interface Props {
 
 const { post } = Astro.props;
 const { Content } = await render(post);
+const tags = post.data.tags || [];
 ---
 
 <article
@@ -25,13 +26,22 @@ const { Content } = await render(post);
     <Content />
   </template>
 
+  <!-- 标签区：自动从 frontmatter 读取 -->
+  {tags.length > 0 && (
+    <div class="post-tags">
+      {tags.map((tag) => (
+        <span class="post-tag" data-tag={tag}>{tag}</span>
+      ))}
+    </div>
+  )}
+
   <div class="post-title">{post.data.title}</div>
   <div class="post-meta">
     <span>
       <i class="fa-regular fa-calendar"></i>
       {post.data.date}
     </span>
-    <span>
+    <span class="post-category-link" data-category={post.data.category}>
       <i class="fa-regular fa-folder"></i>
       {post.data.category}
     </span>

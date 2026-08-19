@@ -769,15 +769,19 @@ document
 
 
 /* ================================================================
-   6. 文章 FLIP 动画
+   6. 文章 FLIP 动画（小米澎湃OS3风格，支持打断）
 ================================================================ */
 
 let activeCard = null;
 
-let isAnimating = false;
-
 /** 当前打开的文章 ID，用于区分不同文章的评论 */
 let currentPostId = "";
+
+/** 当前正在运行的文章过渡动画，用于打断/反向 */
+let articleAnimation = null;
+
+/** 内容淡入定时器 */
+let contentFadeTimer = null;
 
 const overlay =
     document.getElementById(
@@ -804,6 +808,38 @@ const mainWrapper =
         "mainWrapper"
     );
 
+const ANIMATION_DURATION = 420;
+const ANIMATION_EASING = "cubic-bezier(0.16, 1, 0.3, 1)";
+
+/** 计算从卡片到全屏的关键帧 */
+function buildCardToFullscreenKeyframes(cardRect) {
+    const startTransform = `translate3d(${cardRect.left}px, ${cardRect.top}px, 0) scale(${cardRect.width / window.innerWidth}, ${cardRect.height / window.innerHeight})`;
+    return [
+        { transform: startTransform, borderRadius: "26px" },
+        { transform: "translate3d(0,0,0) scale(1,1)", borderRadius: "0px" }
+    ];
+}
+
+/** 显示文章内容（淡入） */
+function showArticleContent() {
+    if (contentFadeTimer) clearTimeout(contentFadeTimer);
+    contentFadeTimer = setTimeout(() => {
+        articleContent.classList.remove("content-hidden");
+        articleContent.classList.add("content-visible");
+    }, 180);
+}
+
+/** 隐藏文章内容 */
+function hideArticleContent() {
+    if (contentFadeTimer) clearTimeout(contentFadeTimer);
+    articleContent.classList.remove("content-visible");
+    articleContent.classList.add("content-hidden");
+}
+
+/** 清理动画结束后的状态 */
+function cleanupAnimation() {
+    articleAnimation = null;
+}
 
 function openArticle(
     card,
@@ -812,233 +848,135 @@ function openArticle(
     date,
     category
 ) {
-
-    if (
-        isAnimating
-    ) {
-        return;
+    // 如果正在动画中，先取消当前动画
+    if (articleAnimation) {
+        articleAnimation.cancel();
+        articleAnimation = null;
     }
 
-    isAnimating = true;
-
-    activeCard =
-        card;
-
-    // 记录当前文章 ID，用于评论区分
+    activeCard = card;
     currentPostId = postId;
 
-    // 更新 URL hash，刷新后能恢复文章状态，也方便分享链接
     if (postId) {
         history.replaceState(null, "", `#post-${postId}`);
     }
 
-    document.getElementById(
-        "viewTitle"
-    ).innerText =
-        title;
-
-    document.getElementById(
-        "viewMeta"
-    ).innerHTML =
-        `
+    document.getElementById("viewTitle").innerText = title;
+    document.getElementById("viewMeta").innerHTML = `
         <i class="fa-regular fa-calendar"></i>
         ${date}
         &nbsp;&nbsp;|&nbsp;&nbsp;
         <i class="fa-regular fa-folder"></i>
         ${category}
-        `;
+    `;
 
-    // 从卡片的 template 中读取渲染后的文章 HTML（支持 md+html+iframe）
+    // 从卡片的 template 中读取渲染后的文章 HTML
     const template = card.querySelector("template[data-post-html]");
     const rawHtml = template ? template.innerHTML : "";
-
-    // 处理自定义 Markdown 语法（提示框、剧透、GitHub卡片等）
     const enhancedHtml = enhanceMarkdownHtml(rawHtml);
-
     const viewBody = document.getElementById("viewBody");
     viewBody.innerHTML = enhancedHtml;
-
-    // DOM 注入后处理：代码块复制按钮、GitHub卡片动态加载
     enhanceMarkdownDom(viewBody);
 
-    const first =
-        card.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
 
-    /*
-     * 进入文章：
-     * 隐藏整个原页面。
-     */
-    document.body.classList.add(
-        "article-mode"
-    );
+    // 进入文章模式
+    document.body.classList.add("article-mode");
+    overlay.classList.add("active");
+    document.body.style.overflow = "hidden";
+    card.classList.add("morph-hidden");
 
-    overlay.classList.add(
-        "active"
-    );
+    // 内容先隐藏
+    articleContent.classList.remove("content-visible");
+    articleContent.classList.add("content-hidden");
 
-    document.body.style.overflow =
-        "hidden";
+    // 设置初始状态
+    articlePage.style.transition = "none";
+    const startTransform = `translate3d(${cardRect.left}px, ${cardRect.top}px, 0) scale(${cardRect.width / window.innerWidth}, ${cardRect.height / window.innerHeight})`;
+    articlePage.style.transform = startTransform;
+    articlePage.style.borderRadius = "26px";
+    articlePage.style.opacity = "1";
 
-    articlePage.style.transition =
-        "none";
-
-    articlePage.style.transform =
-        `
-        translate3d(
-            ${first.left}px,
-            ${first.top}px,
-            0
-        )
-        scale(
-            ${first.width / window.innerWidth},
-            ${first.height / window.innerHeight}
-        )
-        `;
-
-    articlePage.style.borderRadius =
-        "26px";
-
-    articlePage.style.opacity =
-        "1";
-
-    articleContent.classList.remove(
-        "content-visible"
-    );
-
-    articleContent.classList.add(
-        "content-hidden"
-    );
-
-    card.classList.add(
-        "morph-hidden"
-    );
-
+    // 强制重排
     articlePage.getBoundingClientRect();
 
-    requestAnimationFrame(
-        () => {
-
-            articlePage.style.transition =
-                `
-                transform 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                border-radius 430ms cubic-bezier(0.16, 1, 0.3, 1)
-                `;
-
-            articlePage.style.transform =
-                "translate3d(0,0,0) scale(1,1)";
-
-            articlePage.style.borderRadius =
-                "0px";
-
-            setTimeout(
-                () => {
-
-                    articleContent.classList.remove(
-                        "content-hidden"
-                    );
-
-                    articleContent.classList.add(
-                        "content-visible"
-                    );
-
-                },
-                260
-            );
-
-            setTimeout(
-                () => {
-
-                    isAnimating = false;
-
-                },
-                450
-            );
+    // 使用 Web Animations API 播放动画（支持打断/反向）
+    articleAnimation = articlePage.animate(
+        buildCardToFullscreenKeyframes(cardRect),
+        {
+            duration: ANIMATION_DURATION,
+            easing: ANIMATION_EASING,
+            fill: "forwards"
         }
     );
+
+    // 动画进行到一定程度时淡入内容
+    showArticleContent();
+
+    articleAnimation.onfinish = () => {
+        // 动画结束后将样式固化到元素上
+        articlePage.style.transform = "translate3d(0,0,0) scale(1,1)";
+        articlePage.style.borderRadius = "0px";
+        cleanupAnimation();
+    };
 }
 
 
 function closeArticle() {
+    if (!activeCard) return;
 
-    if (
-        !activeCard ||
-        isAnimating
-    ) {
+    // 如果正在播放打开动画，直接反向播放（实现打断）
+    if (articleAnimation) {
+        articleAnimation.reverse();
+        hideArticleContent();
+        articleAnimation.onfinish = () => {
+            finishCloseArticle();
+        };
         return;
     }
 
-    isAnimating = true;
+    // 正常关闭：从全屏动画回卡片位置
+    hideArticleContent();
 
-    articleContent.classList.remove(
-        "content-visible"
+    const cardRect = activeCard.getBoundingClientRect();
+
+    articlePage.style.transition = "none";
+    articlePage.style.transform = "translate3d(0,0,0) scale(1,1)";
+    articlePage.style.borderRadius = "0px";
+    articlePage.getBoundingClientRect();
+
+    articleAnimation = articlePage.animate(
+        [
+            { transform: "translate3d(0,0,0) scale(1,1)", borderRadius: "0px" },
+            { transform: `translate3d(${cardRect.left}px, ${cardRect.top}px, 0) scale(${cardRect.width / window.innerWidth}, ${cardRect.height / window.innerHeight})`, borderRadius: "26px" }
+        ],
+        {
+            duration: ANIMATION_DURATION,
+            easing: ANIMATION_EASING,
+            fill: "forwards"
+        }
     );
 
-    articleContent.classList.add(
-        "content-hidden"
-    );
+    articleAnimation.onfinish = () => {
+        finishCloseArticle();
+    };
+}
 
-    /* 立即计算卡片位置，避免等待 110ms 导致返回时页面出现断层。 */
-    const first =
-        activeCard.getBoundingClientRect();
-
-    articlePage.style.transition =
-        `
-        transform 390ms cubic-bezier(0.16, 1, 0.3, 1),
-        border-radius 390ms cubic-bezier(0.16, 1, 0.3, 1)
-        `;
-
-    articlePage.style.transform =
-        `
-        translate3d(
-            ${first.left}px,
-            ${first.top}px,
-            0
-        )
-        scale(
-            ${first.width / window.innerWidth},
-            ${first.height / window.innerHeight}
-        )
-        `;
-
-    articlePage.style.borderRadius =
-        "26px";
-
-    /* 缩回动画结束前保持原卡片隐藏，结束时再一次性恢复。 */
-    setTimeout(
-        () => {
-            overlay.classList.remove(
-                "active"
-            );
-
-            document.body.classList.remove(
-                "article-mode"
-            );
-
-            activeCard.classList.remove(
-                "morph-hidden"
-            );
-
-            articlePage.style.transition =
-                "none";
-
-            articlePage.style.transform =
-                "translate3d(0,0,0) scale(1)";
-
-            articlePage.style.borderRadius =
-                "0px";
-
-            document.body.style.overflow =
-                "";
-
-            isAnimating = false;
-            activeCard = null;
-            currentPostId = "";
-
-            // 清除 hash
-            history.replaceState(null, "", window.location.pathname);
-        },
-        400
-    );
+/** 关闭动画结束后的清理 */
+function finishCloseArticle() {
+    overlay.classList.remove("active");
+    document.body.classList.remove("article-mode");
+    if (activeCard) {
+        activeCard.classList.remove("morph-hidden");
+    }
+    articlePage.style.transition = "none";
+    articlePage.style.transform = "translate3d(0,0,0) scale(1)";
+    articlePage.style.borderRadius = "0px";
+    document.body.style.overflow = "";
+    cleanupAnimation();
+    activeCard = null;
+    currentPostId = "";
+    history.replaceState(null, "", window.location.pathname);
 }
 
 
@@ -1049,145 +987,6 @@ backBtn.addEventListener(
         e.preventDefault();
 
         closeArticle();
-    }
-);
-
-
-/* ================================================================
-   7. 点赞
-================================================================ */
-
-const likeBtn =
-    document.getElementById(
-        "likeBtn"
-    );
-
-const likeIcon =
-    document.getElementById(
-        "likeIcon"
-    );
-
-const likeActionItem =
-    document.getElementById(
-        "likeActionItem"
-    );
-
-const likersPopover =
-    document.getElementById(
-        "likersPopover"
-    );
-
-let pressTimer = null;
-
-let isLiked = false;
-
-
-likeBtn.addEventListener(
-    "click",
-    () => {
-
-        isLiked =
-            !isLiked;
-
-        if (
-            isLiked
-        ) {
-
-            likeActionItem.classList.add(
-                "liked"
-            );
-
-            likeIcon.className =
-                "fa-solid fa-heart";
-
-            showToast(
-                "已点赞该文章"
-            );
-
-        } else {
-
-            likeActionItem.classList.remove(
-                "liked"
-            );
-
-            likeIcon.className =
-                "fa-regular fa-heart";
-        }
-    }
-);
-
-
-function startPress() {
-
-    clearTimeout(
-        pressTimer
-    );
-
-    pressTimer =
-        setTimeout(
-            () => {
-
-                likersPopover.classList.add(
-                    "active"
-                );
-
-            },
-            500
-        );
-}
-
-
-function cancelPress() {
-
-    clearTimeout(
-        pressTimer
-    );
-}
-
-
-likeBtn.addEventListener(
-    "touchstart",
-    startPress,
-    {
-        passive: true
-    }
-);
-
-likeBtn.addEventListener(
-    "mousedown",
-    startPress
-);
-
-likeBtn.addEventListener(
-    "touchend",
-    cancelPress
-);
-
-likeBtn.addEventListener(
-    "mouseup",
-    cancelPress
-);
-
-likeBtn.addEventListener(
-    "mouseleave",
-    cancelPress
-);
-
-
-document.addEventListener(
-    "click",
-    (e) => {
-
-        if (
-            !likeActionItem.contains(
-                e.target
-            )
-        ) {
-
-            likersPopover.classList.remove(
-                "active"
-            );
-        }
     }
 );
 
@@ -1755,6 +1554,45 @@ document.addEventListener(
 );
 
 /* ================================================================
+   分类筛选
+================================================================ */
+
+let currentCategory = "all";
+
+function filterByCategory(category) {
+    currentCategory = category;
+
+    // 更新分类栏按钮状态
+    document.querySelectorAll(".cat-btn").forEach((btn) => {
+        const el = btn as HTMLElement;
+        if (el.dataset.category === category) {
+            el.classList.add("active");
+        } else {
+            el.classList.remove("active");
+        }
+    });
+
+    // 筛选文章卡片
+    document.querySelectorAll(".post-card").forEach((card) => {
+        const el = card as HTMLElement;
+        const cardCategory = el.dataset.category || "";
+        if (category === "all" || cardCategory === category) {
+            el.style.display = "";
+        } else {
+            el.style.display = "none";
+        }
+    });
+}
+
+// 分类栏按钮点击
+document.querySelectorAll(".cat-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const category = (btn as HTMLElement).dataset.category || "all";
+        filterByCategory(category);
+    });
+});
+
+/* ================================================================
    Astro migration bindings
    原 HTML 使用 inline onclick。Astro 组件不依赖 inline handler，
    因此在客户端为文章卡片绑定同等行为。
@@ -1778,6 +1616,46 @@ document.querySelectorAll(".post-card").forEach((card) => {
             event.preventDefault();
             open();
         }
+    });
+
+    // 卡片内分类标签点击：筛选分类，不打开文章
+    const categoryLink = card.querySelector(".post-category-link");
+    if (categoryLink) {
+        categoryLink.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const category = (categoryLink as HTMLElement).dataset.category || "";
+            if (category) {
+                filterByCategory(category);
+                // 滚动到分类栏
+                document.querySelector(".category-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        });
+    }
+
+    // 卡片内标签点击：按标签筛选（简单实现：显示包含该标签的文章）
+    card.querySelectorAll(".post-tag").forEach((tag) => {
+        tag.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const tagName = (tag as HTMLElement).dataset.tag || "";
+            if (tagName) {
+                // 切换显示：只显示包含该标签的文章
+                document.querySelectorAll(".post-card").forEach((c) => {
+                    const tags = Array.from(c.querySelectorAll(".post-tag")).map(
+                        (t) => (t as HTMLElement).dataset.tag
+                    );
+                    if (tags.includes(tagName)) {
+                        (c as HTMLElement).style.display = "";
+                    } else {
+                        (c as HTMLElement).style.display = "none";
+                    }
+                });
+                // 重置分类栏状态
+                document.querySelectorAll(".cat-btn").forEach((btn) => {
+                    btn.classList.remove("active");
+                });
+                showToast(`筛选标签：${tagName}`);
+            }
+        });
     });
 });
 

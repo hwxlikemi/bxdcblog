@@ -2,6 +2,7 @@
 title: Markdown 增强功能测试
 date: "2026-08-19"
 category: 技术折腾
+tags: ["Markdown", "测试", "前端"]
 excerpt: 测试代码块复制、提示框、GitHub卡片、折叠剧透等增强功能……
 ---
 

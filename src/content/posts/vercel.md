@@ -2,6 +2,7 @@
 title: 关于博客搭建与迁移 Vercel 的二三事
 date: "2026-08-15"
 category: 日常随笔
+tags: ["Vercel", "部署", "GitHub Pages"]
 excerpt: 记录使用 Vercel 与 GitHub Pages 构建个人站点的过程与心得……
 ---
 
