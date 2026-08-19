@@ -2416,3 +2416,139 @@
                 overflow: visible;
             }
         }
+
+        /* =========================================================
+           30. Markdown 文章内容样式
+        ========================================================= */
+
+        .article-content {
+            word-break: break-word;
+        }
+
+        .article-content h1,
+        .article-content h2,
+        .article-content h3,
+        .article-content h4,
+        .article-content h5,
+        .article-content h6 {
+            font-weight: 700;
+            margin: 1.8em 0 0.8em;
+            line-height: 1.4;
+            color: var(--text-primary);
+        }
+
+        .article-content h1 { font-size: 1.8rem; }
+        .article-content h2 { font-size: 1.5rem; }
+        .article-content h3 { font-size: 1.25rem; }
+        .article-content h4 { font-size: 1.1rem; }
+
+        .article-content p {
+            margin: 1em 0;
+        }
+
+        .article-content a {
+            color: var(--accent-color);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(2, 132, 199, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-content a:hover {
+            border-bottom-color: var(--accent-color);
+        }
+
+        .article-content ul,
+        .article-content ol {
+            margin: 1em 0;
+            padding-left: 1.8em;
+        }
+
+        .article-content li {
+            margin: 0.4em 0;
+        }
+
+        .article-content blockquote {
+            margin: 1.2em 0;
+            padding: 0.8em 1.2em;
+            border-left: 4px solid var(--accent-color);
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 0 12px 12px 0;
+            color: var(--text-secondary);
+        }
+
+        .article-content blockquote p {
+            margin: 0.4em 0;
+        }
+
+        .article-content code {
+            font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+            font-size: 0.88em;
+            background: rgba(15, 23, 42, 0.12);
+            padding: 0.15em 0.45em;
+            border-radius: 6px;
+            color: #be185d;
+        }
+
+        .article-content pre {
+            margin: 1.2em 0;
+            padding: 1em 1.2em;
+            background: rgba(15, 23, 42, 0.85);
+            color: #e2e8f0;
+            border-radius: 14px;
+            overflow-x: auto;
+            font-size: 0.88rem;
+            line-height: 1.7;
+        }
+
+        .article-content pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+
+        .article-content img {
+            max-width: 100%;
+            border-radius: 14px;
+            margin: 1.2em 0;
+            display: block;
+        }
+
+        .article-content iframe {
+            max-width: 100%;
+            border: none;
+            border-radius: 14px;
+            margin: 1.2em 0;
+            display: block;
+        }
+
+        .article-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.2em 0;
+            font-size: 0.92rem;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .article-content th,
+        .article-content td {
+            padding: 0.7em 1em;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            text-align: left;
+        }
+
+        .article-content th {
+            background: rgba(255, 255, 255, 0.12);
+            font-weight: 600;
+        }
+
+        .article-content hr {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            margin: 2em 0;
+        }
+
+        .article-content div {
+            max-width: 100%;
+        }

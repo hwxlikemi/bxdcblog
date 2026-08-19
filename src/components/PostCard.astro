@@ -1,36 +1,42 @@
 ---
-import type { Post } from "../data/posts";
+import { render, type CollectionEntry } from "astro:content";
 
 interface Props {
-  post: Post;
+  post: CollectionEntry<"posts">;
 }
 
 const { post } = Astro.props;
+const { Content } = await render(post);
 ---
 
 <article
   class="post-card"
-  data-post-id={post.id}
-  data-title={post.title}
-  data-date={post.date}
-  data-category={post.category}
-  data-content={post.content}
+  data-post-id={post.slug}
+  data-title={post.data.title}
+  data-date={post.data.date}
+  data-category={post.data.category}
+  data-excerpt={post.data.excerpt || ""}
   tabindex="0"
   role="button"
-  aria-label={`打开文章：${post.title}`}
+  aria-label={`打开文章：${post.data.title}`}
 >
-  <div class="post-title">{post.title}</div>
+  <!-- 渲染后的文章 HTML 存储在 template 中，打开文章时读取 -->
+  <template data-post-html>
+    <Content />
+  </template>
+
+  <div class="post-title">{post.data.title}</div>
   <div class="post-meta">
     <span>
       <i class="fa-regular fa-calendar"></i>
-      {post.date}
+      {post.data.date}
     </span>
     <span>
       <i class="fa-regular fa-folder"></i>
-      {post.category}
+      {post.data.category}
     </span>
   </div>
-  <p class="post-excerpt">{post.excerpt}</p>
+  <p class="post-excerpt">{post.data.excerpt}</p>
   <div class="post-hint">
     <i class="fa-solid fa-arrow-right"></i>
     点击打开文章

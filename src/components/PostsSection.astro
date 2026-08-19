@@ -1,7 +1,12 @@
 ---
-import { posts } from "../data/posts";
+import { getCollection } from "astro:content";
 import CategoryBar from "./CategoryBar.astro";
 import PostCard from "./PostCard.astro";
+
+// 从 content collection 读取文章，过滤草稿，按日期倒序
+const posts = (await getCollection("posts", ({ data }) => !data.draft)).sort(
+  (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+);
 ---
 
 <main>

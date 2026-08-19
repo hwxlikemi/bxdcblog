@@ -705,8 +705,7 @@ function openArticle(
     postId,
     title,
     date,
-    category,
-    content
+    category
 ) {
 
     if (
@@ -744,10 +743,14 @@ function openArticle(
         ${category}
         `;
 
+    // 从卡片的 template 中读取渲染后的文章 HTML（支持 md+html+iframe）
+    const template = card.querySelector("template[data-post-html]");
+    const articleHtml = template ? template.innerHTML : "";
+
     document.getElementById(
         "viewBody"
-    ).innerText =
-        content;
+    ).innerHTML =
+        articleHtml;
 
     const first =
         card.getBoundingClientRect();
@@ -1656,8 +1659,7 @@ document.querySelectorAll(".post-card").forEach((card) => {
             el.dataset.postId || "",
             el.dataset.title || "",
             el.dataset.date || "",
-            el.dataset.category || "",
-            el.dataset.content || ""
+            el.dataset.category || ""
         );
     };
 
