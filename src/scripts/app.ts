@@ -139,35 +139,39 @@ const blurVal =
         "blurVal"
     );
 
-opacityRange.addEventListener(
-    "input",
-    (e) => {
+if (opacityRange && opacityVal) {
+    opacityRange.addEventListener(
+        "input",
+        (e) => {
 
-        document.documentElement.style.setProperty(
-            "--glass-opacity",
-            e.target.value
-        );
+            document.documentElement.style.setProperty(
+                "--glass-opacity",
+                e.target.value
+            );
 
-        opacityVal.innerText =
-            Math.round(
-                e.target.value * 100
-            ) + "%";
-    }
-);
+            opacityVal.innerText =
+                Math.round(
+                    e.target.value * 100
+                ) + "%";
+        }
+    );
+}
 
-blurRange.addEventListener(
-    "input",
-    (e) => {
+if (blurRange && blurVal) {
+    blurRange.addEventListener(
+        "input",
+        (e) => {
 
-        document.documentElement.style.setProperty(
-            "--glass-blur",
-            e.target.value + "px"
-        );
+            document.documentElement.style.setProperty(
+                "--glass-blur",
+                e.target.value + "px"
+            );
 
-        blurVal.innerText =
-            e.target.value + "px";
-    }
-);
+            blurVal.innerText =
+                e.target.value + "px";
+        }
+    );
+}
 
 const refractiveRange =
     document.getElementById("refractiveRange");
@@ -175,18 +179,20 @@ const refractiveRange =
 const refractiveVal =
     document.getElementById("refractiveVal");
 
-refractiveRange.addEventListener(
-    "input",
-    (e) => {
-        const value = Number(e.target.value);
-        document.documentElement.style.setProperty(
-            "--glass-refractive-index",
-            value
-        );
-        refractiveVal.innerText =
-            value.toFixed(2);
-    }
-);
+if (refractiveRange && refractiveVal) {
+    refractiveRange.addEventListener(
+        "input",
+        (e) => {
+            const value = Number(e.target.value);
+            document.documentElement.style.setProperty(
+                "--glass-refractive-index",
+                value
+            );
+            refractiveVal.innerText =
+                value.toFixed(2);
+        }
+    );
+}
 
 
 /* ================================================================
@@ -601,6 +607,104 @@ commonProgressBar.addEventListener(
         }
     }
 );
+
+
+/* ================================================================
+   4.5 播放列表
+================================================================ */
+
+const playlistOverlay =
+    document.getElementById("playlistOverlay");
+
+const playlistItems =
+    document.getElementById("playlistItems");
+
+const playlistClose =
+    document.getElementById("playlistClose");
+
+const listBtn =
+    document.getElementById("listBtn");
+
+const popListBtn =
+    document.getElementById("popListBtn");
+
+function renderPlaylist() {
+    if (!playlistItems) return;
+
+    playlistItems.innerHTML = "";
+
+    currentPlaylist.forEach((track, index) => {
+        const item = document.createElement("div");
+        item.className = "playlist-item";
+        if (index === currentTrackIndex) {
+            item.classList.add("active");
+        }
+        item.innerHTML = `
+            <div class="playlist-item-index">${index + 1}</div>
+            <div class="playlist-item-info">
+                <div class="playlist-item-title">${track.title}</div>
+                <div class="playlist-item-artist">${track.artist}</div>
+            </div>
+            <div class="playlist-item-play">
+                <i class="fa-solid ${index === currentTrackIndex && !audioPlayer.paused ? 'fa-pause' : 'fa-play'}"></i>
+            </div>
+        `;
+        item.addEventListener("click", () => {
+            currentTrackIndex = index;
+            loadTrack(index);
+            audioPlayer.play();
+            renderPlaylist();
+        });
+        playlistItems.appendChild(item);
+    });
+}
+
+function togglePlaylist() {
+    if (!playlistOverlay) return;
+    renderPlaylist();
+    playlistOverlay.classList.toggle("active");
+}
+
+if (listBtn) {
+    listBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        togglePlaylist();
+    });
+}
+
+if (popListBtn) {
+    popListBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        togglePlaylist();
+    });
+}
+
+if (playlistClose) {
+    playlistClose.addEventListener("click", () => {
+        playlistOverlay.classList.remove("active");
+    });
+}
+
+if (playlistOverlay) {
+    playlistOverlay.addEventListener("click", (e) => {
+        if (e.target === playlistOverlay) {
+            playlistOverlay.classList.remove("active");
+        }
+    });
+}
+
+// 播放状态变化时更新播放列表高亮
+audioPlayer.addEventListener("play", () => {
+    if (playlistOverlay?.classList.contains("active")) {
+        renderPlaylist();
+    }
+});
+
+audioPlayer.addEventListener("pause", () => {
+    if (playlistOverlay?.classList.contains("active")) {
+        renderPlaylist();
+    }
+});
 
 
 /* ================================================================

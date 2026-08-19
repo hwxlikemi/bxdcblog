@@ -33,6 +33,19 @@ import Toast from "../components/Toast.astro";
 
   <input id="imgFileInput" type="file" accept="image/*" />
 
+  <!-- 播放列表 -->
+  <div id="playlistOverlay" class="playlist-overlay">
+    <div class="playlist-panel">
+      <div class="playlist-header">
+        <span><i class="fa-solid fa-music"></i> 播放列表</span>
+        <button id="playlistClose" class="playlist-close-btn" type="button">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="playlist-items" id="playlistItems"></div>
+    </div>
+  </div>
+
   <Toast />
 </Layout>
 
