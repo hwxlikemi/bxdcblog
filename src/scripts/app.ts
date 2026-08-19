@@ -7,6 +7,7 @@ import {
     likeComment,
     type TwikooComment,
 } from "./twikoo-api";
+import { enhanceMarkdownHtml, enhanceMarkdownDom } from "./markdown-enhance";
 
 /* ================================================================
    1. 动态日历
@@ -745,12 +746,16 @@ function openArticle(
 
     // 从卡片的 template 中读取渲染后的文章 HTML（支持 md+html+iframe）
     const template = card.querySelector("template[data-post-html]");
-    const articleHtml = template ? template.innerHTML : "";
+    const rawHtml = template ? template.innerHTML : "";
 
-    document.getElementById(
-        "viewBody"
-    ).innerHTML =
-        articleHtml;
+    // 处理自定义 Markdown 语法（提示框、剧透、GitHub卡片等）
+    const enhancedHtml = enhanceMarkdownHtml(rawHtml);
+
+    const viewBody = document.getElementById("viewBody");
+    viewBody.innerHTML = enhancedHtml;
+
+    // DOM 注入后处理：代码块复制按钮、GitHub卡片动态加载
+    enhanceMarkdownDom(viewBody);
 
     const first =
         card.getBoundingClientRect();

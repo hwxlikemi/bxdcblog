@@ -23,9 +23,9 @@ export const siteConfig = {
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80",
 
     glass: {
-      opacity: 0.08,
-      blur: 28,
-      refractiveIndex: 1.33,
+      opacity: 0.02,
+      blur: 6,
+      refractiveIndex: 2.00,
       border: "rgba(255, 255, 255, 0.45)",
     },
 
