@@ -52,6 +52,6 @@ function hello() {
 <iframe src="//player.bilibili.com/player.html?isOutside=true&aid=116090667540095&bvid=BV1ALZDBtEfK&cid=36139303706&p=1&autoplay=0" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" style="width: 100%; aspect-ratio: 16/9; border-radius: 12px;"></iframe>
 
 # YouTube
-<iframe width="100%" height="315" src="https://www.youtube.com/embed/szn2R3_d8UA?si=BcIMHwwSnPT88s5d" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<iframe width="100%" height="360" src="https://www.youtube.com/embed/szn2R3_d8UA?si=BcIMHwwSnPT88s5d" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 也可以嵌入其他网站，例如 CodePen、YouTube 等。
