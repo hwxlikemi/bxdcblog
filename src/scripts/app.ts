@@ -1398,8 +1398,18 @@ async function loadTwikooComments(){
 
     try {
 
-        const comments =
+        const result:any =
             await fetchComments();
+
+
+        const comments =
+            Array.isArray(result)
+                ? result
+                : (
+                    result?.data ||
+                    result?.comments ||
+                    []
+                );
 
 
         if(!commentListScroll){
@@ -1412,7 +1422,7 @@ async function loadTwikooComments(){
 
 
         comments.forEach(
-            item => {
+            (item:any) => {
 
                 const node =
                     document.createElement(
