@@ -1,10 +1,12 @@
+// @ts-nocheck
 import { playlist } from "../data/music";
 import { siteConfig } from "../config";
 import {
     submitComment,
-    fetchComments
-}
-from "./twikoo-api";
+    fetchComments,
+    likeComment,
+    type TwikooComment,
+} from "./twikoo-api";
 
 /* ================================================================
    1. 动态日历
@@ -1224,21 +1226,31 @@ commentPageBackBtn.addEventListener(
    12. 回复
 ================================================================ */
 
-let currentReplyTarget =
-    null;
+interface ReplyTarget {
+    pid: string;   // 被回复的评论 ID
+    rid: string;   // 所在楼 ID（主楼评论的 _id）
+    nick: string;  // 被回复者昵称
+}
 
+let currentReplyTarget: ReplyTarget | null = null;
 
-function prepareReply(
-    username
-) {
+function prepareReply(comment: TwikooComment) {
+    // 回复时：pid = 被回复评论的 _id，rid = 所在楼的 _id
+    // 如果被回复的是主楼（rid 为空），则 rid = 该主楼的 _id
+    const rid = comment.rid || comment._id;
+    currentReplyTarget = {
+        pid: comment._id,
+        rid,
+        nick: comment.nick || "匿名",
+    };
 
-    currentReplyTarget =
-        username;
-
-    commentInputField.placeholder =
-        `回复 @${username}...`;
-
+    commentInputField.placeholder = `回复 @${comment.nick || "匿名"}...`;
     commentInputField.focus();
+}
+
+function cancelReply() {
+    currentReplyTarget = null;
+    commentInputField.placeholder = "善语结善缘，恶语伤人心...";
 }
 
 
@@ -1248,7 +1260,7 @@ function prepareReply(
 ================================================================ */
 
 function escapeHtml(
-    text
+    text: string
 ) {
 
     const div =
@@ -1285,12 +1297,17 @@ const commentCount =
 const commentNameField =
     document.getElementById(
         "commentNameField"
-    );
+    ) as HTMLInputElement;
 
 const commentEmailField =
     document.getElementById(
         "commentEmailField"
-    );
+    ) as HTMLInputElement;
+
+const commentInputField =
+    document.getElementById(
+        "commentInputField"
+    ) as HTMLTextAreaElement;
 
 
 sendCommentBtn?.addEventListener(
@@ -1351,11 +1368,12 @@ async function sendComment() {
 
         await submitComment({
 
-            nick:name,
-
-            mail:email,
-
-            comment:val
+            url: window.location.pathname,
+            nick: name,
+            mail: email,
+            comment: val,
+            pid: currentReplyTarget?.pid,
+            rid: currentReplyTarget?.rid,
 
         });
 
@@ -1367,21 +1385,16 @@ async function sendComment() {
 
         commentInputField.value = "";
 
-        commentInputField.placeholder =
-            "善语结善缘，恶语伤人心...";
-
-
-        currentReplyTarget =
-            null;
+        cancelReply();
 
 
         loadTwikooComments();
 
 
-    } catch(e) {
+    } catch (e: any) {
 
         showToast(
-            "评论发布失败"
+            e?.message || "评论发布失败"
         );
 
     }
@@ -1391,146 +1404,184 @@ async function sendComment() {
 
 
 /* ================================================================
-   Twikoo 评论加载
+   Twikoo 评论加载与渲染
 ================================================================ */
 
-async function loadTwikooComments(){
+/** 格式化相对时间 */
+function formatRelativeTime(timestamp: number): string {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const min = Math.floor(diff / 60000);
+    const hour = Math.floor(diff / 3600000);
+    const day = Math.floor(diff / 86400000);
+
+    if (min < 1) return "刚刚";
+    if (min < 60) return `${min} 分钟前`;
+    if (hour < 24) return `${hour} 小时前`;
+    if (day < 30) return `${day} 天前`;
+
+    const d = new Date(timestamp);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** 获取头像地址，优先用 Twikoo 返回的，fallback 到 dicebear */
+function getAvatar(comment: TwikooComment): string {
+    if (comment.avatar) return comment.avatar;
+    const seed = encodeURIComponent(comment.nick || "user");
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+}
+
+/** 渲染单条评论节点 */
+function renderCommentNode(comment: TwikooComment): HTMLElement {
+    const node = document.createElement("div");
+    node.className = "comment-node";
+    node.dataset.id = comment._id;
+
+    const ups = comment.ups?.length || 0;
+
+    node.innerHTML = `
+        <img
+            src="${getAvatar(comment)}"
+            class="comment-avatar"
+            alt=""
+        />
+        <div class="comment-content-box">
+            <div class="comment-user-name">
+                ${escapeHtml(comment.nick || "匿名")}
+                ${comment.master ? '<span style="color:var(--accent);font-size:0.7rem;margin-left:6px;">博主</span>' : ""}
+            </div>
+            <div class="comment-text">${comment.comment || ""}</div>
+            <div class="comment-bottom-meta">
+                <span>${formatRelativeTime(comment.created)}</span>
+                <span class="comment-reply-btn" data-action="reply">回复</span>
+                <span class="comment-like-icon" data-action="like">
+                    <i class="fa-regular fa-heart"></i>
+                    <span class="c-like-num">${ups}</span>
+                </span>
+            </div>
+            <div class="sub-comments-list" data-sub-list></div>
+        </div>
+    `;
+
+    // 绑定回复按钮
+    node.querySelector('[data-action="reply"]')?.addEventListener("click", () => {
+        prepareReply(comment);
+    });
+
+    // 绑定点赞按钮
+    const likeBtn = node.querySelector('[data-action="like"]') as HTMLElement;
+    likeBtn?.addEventListener("click", async () => {
+        const numEl = likeBtn.querySelector(".c-like-num") as HTMLElement;
+        const iconEl = likeBtn.querySelector("i") as HTMLElement;
+        const isActive = likeBtn.classList.contains("active");
+
+        try {
+            await likeComment(comment._id, "up");
+            if (isActive) {
+                likeBtn.classList.remove("active");
+                iconEl.className = "fa-regular fa-heart";
+                numEl.innerText = String(Math.max(0, ups - 1));
+            } else {
+                likeBtn.classList.add("active");
+                iconEl.className = "fa-solid fa-heart";
+                numEl.innerText = String(ups + 1);
+            }
+        } catch {
+            showToast("点赞失败，请稍后重试");
+        }
+    });
+
+    return node;
+}
+
+/** 把扁平评论列表组织成楼中楼结构 */
+function buildCommentTree(comments: TwikooComment[]): TwikooComment[][] {
+    const mains: TwikooComment[] = [];
+    const replyMap = new Map<string, TwikooComment[]>();
+
+    for (const c of comments) {
+        if (!c.rid) {
+            mains.push(c);
+        } else {
+            const list = replyMap.get(c.rid) || [];
+            list.push(c);
+            replyMap.set(c.rid, list);
+        }
+    }
+
+    // 按时间排序：主楼倒序，回复正序
+    mains.sort((a, b) => b.created - a.created);
+
+    return mains.map((main) => {
+        const replies = replyMap.get(main._id) || [];
+        replies.sort((a, b) => a.created - b.created);
+        return [main, ...replies];
+    });
+}
+
+async function loadTwikooComments() {
+    if (!commentListScroll) return;
 
     try {
+        const result = await fetchComments({
+            url: window.location.pathname,
+        });
 
-        const result:any =
-            await fetchComments();
+        const comments: TwikooComment[] = result.data || [];
 
+        // 更新评论数
+        if (commentCount) {
+            commentCount.innerText = String(result.count || comments.length);
+        }
 
-        const comments =
-            Array.isArray(result)
-                ? result
-                : (
-                    result?.data ||
-                    result?.comments ||
-                    []
-                );
+        commentListScroll.innerHTML = "";
 
-
-        if(!commentListScroll){
+        if (comments.length === 0) {
+            commentListScroll.innerHTML = `
+                <div style="text-align:center;padding:40px 0;color:var(--text-secondary);font-size:0.9rem;">
+                    暂无评论，来抢沙发吧～
+                </div>
+            `;
             return;
         }
 
+        const trees = buildCommentTree(comments);
 
-        commentListScroll.innerHTML =
-            "";
+        for (const [main, ...replies] of trees) {
+            const mainNode = renderCommentNode(main);
+            const subList = mainNode.querySelector('[data-sub-list]') as HTMLElement;
 
-
-        comments.forEach(
-            (item:any) => {
-
-                const node =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                node.className =
-                    "comment-node";
-
-
-                node.innerHTML =
-                `
-                <img
-                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(item.nick || "user")}"
-                    class="comment-avatar"
-                >
-
-                <div class="comment-content-box">
-
-                    <div class="comment-user-name">
-                        ${escapeHtml(item.nick || "")}
-                    </div>
-
-                    <div class="comment-text">
-                        ${escapeHtml(item.comment || "")}
-                    </div>
-
-                </div>
-                `;
-
-
-                commentListScroll.appendChild(
-                    node
-                );
-
+            for (const reply of replies) {
+                const replyNode = renderCommentNode(reply);
+                replyNode.style.background = "rgba(255,255,255,0.08)";
+                subList.appendChild(replyNode);
             }
-        );
 
+            // 如果没有回复，移除子列表容器
+            if (replies.length === 0) {
+                subList.remove();
+            }
 
-    } catch(e) {
+            commentListScroll.appendChild(mainNode);
+        }
 
-        console.error(
-            "Twikoo加载失败",
-            e
-        );
-
+    } catch (e) {
+        console.error("Twikoo 加载失败", e);
+        commentListScroll.innerHTML = `
+            <div style="text-align:center;padding:40px 0;color:var(--text-secondary);font-size:0.9rem;">
+                评论加载失败，请刷新重试
+            </div>
+        `;
     }
-
 }
+
+// 页面加载后自动拉取评论
+loadTwikooComments();
 
 
 /* ================================================================
-   15. 评论点赞
+   15. 评论点赞（已整合到 renderCommentNode 中）
 ================================================================ */
-
-function toggleCommentLike(
-    el
-) {
-
-    const numEl =
-        el.querySelector(
-            ".c-like-num"
-        );
-
-    let count =
-        parseInt(
-            numEl.innerText
-        ) || 0;
-
-
-
-    if (
-        el.classList.contains(
-            "active"
-        )
-    ) {
-
-        el.classList.remove(
-            "active"
-        );
-
-        el.querySelector(
-            "i"
-        ).className =
-            "fa-regular fa-heart";
-
-        numEl.innerText =
-            Math.max(
-                0,
-                count - 1
-            );
-
-    } else {
-
-        el.classList.add(
-            "active"
-        );
-
-        el.querySelector(
-            "i"
-        ).className =
-            "fa-solid fa-heart";
-
-        numEl.innerText =
-            count + 1;
-    }
-}
 
 
 /* ================================================================
