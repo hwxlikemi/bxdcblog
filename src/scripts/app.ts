@@ -1171,6 +1171,12 @@ commentBtn.addEventListener(
         );
 
         /*
+         * 打开评论页时才拉取评论，
+         * 确保 currentPostId 已是当前文章的 ID。
+         */
+        loadTwikooComments();
+
+        /*
          * 等动画完成后解除锁定。
          */
         setTimeout(
@@ -1591,8 +1597,8 @@ async function loadTwikooComments() {
     }
 }
 
-// 页面加载后自动拉取评论
-loadTwikooComments();
+// 评论在打开评论页时加载，不在页面加载时加载
+// loadTwikooComments();
 
 
 /* ================================================================
