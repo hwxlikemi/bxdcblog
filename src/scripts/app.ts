@@ -769,7 +769,7 @@ document
 
 
 /* ================================================================
-   6. 文章 FLIP 动画（小米澎湃OS3风格，支持打断）
+   6. 文章卡片 Morph 动画（iOS26 风格，支持打断）
 ================================================================ */
 
 let activeCard = null;
@@ -777,11 +777,14 @@ let activeCard = null;
 /** 当前打开的文章 ID，用于区分不同文章的评论 */
 let currentPostId = "";
 
-/** 当前正在运行的文章过渡动画，用于打断/反向 */
+/** 页面变形动画 */
 let articleAnimation = null;
-
+/** 背景变暗动画 */
+let bgAnimation = null;
 /** 内容淡入定时器 */
 let contentFadeTimer = null;
+/** 按压定时器 */
+let pressTimer = null;
 
 const overlay =
     document.getElementById(
@@ -808,16 +811,32 @@ const mainWrapper =
         "mainWrapper"
     );
 
-const ANIMATION_DURATION = 420;
-const ANIMATION_EASING = "cubic-bezier(0.16, 1, 0.3, 1)";
+/* 动画参数：入场 480ms easeOutCubic，退场 420ms easeInOutCubic */
+const OPEN_DURATION = 480;
+const CLOSE_DURATION = 420;
+const EASE_OUT_CUBIC = "cubic-bezier(0.33, 1, 0.68, 1)";
+const EASE_IN_OUT_CUBIC = "cubic-bezier(0.65, 0, 0.35, 1)";
+const BG_DARKEN = "rgba(0,0,0,0.45)";
+const CONTENT_FADE_DELAY = 280;
 
-/** 计算从卡片到全屏的关键帧 */
-function buildCardToFullscreenKeyframes(cardRect) {
-    const startTransform = `translate3d(${cardRect.left}px, ${cardRect.top}px, 0) scale(${cardRect.width / window.innerWidth}, ${cardRect.height / window.innerHeight})`;
-    return [
-        { transform: startTransform, borderRadius: "26px" },
-        { transform: "translate3d(0,0,0) scale(1,1)", borderRadius: "0px" }
-    ];
+/** 取消所有正在运行的动画 */
+function cancelAllAnimations() {
+    if (articleAnimation) {
+        articleAnimation.cancel();
+        articleAnimation = null;
+    }
+    if (bgAnimation) {
+        bgAnimation.cancel();
+        bgAnimation = null;
+    }
+    if (contentFadeTimer) {
+        clearTimeout(contentFadeTimer);
+        contentFadeTimer = null;
+    }
+    if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+    }
 }
 
 /** 显示文章内容（淡入） */
@@ -826,19 +845,18 @@ function showArticleContent() {
     contentFadeTimer = setTimeout(() => {
         articleContent.classList.remove("content-hidden");
         articleContent.classList.add("content-visible");
-    }, 180);
+        contentFadeTimer = null;
+    }, CONTENT_FADE_DELAY);
 }
 
 /** 隐藏文章内容 */
 function hideArticleContent() {
-    if (contentFadeTimer) clearTimeout(contentFadeTimer);
+    if (contentFadeTimer) {
+        clearTimeout(contentFadeTimer);
+        contentFadeTimer = null;
+    }
     articleContent.classList.remove("content-visible");
     articleContent.classList.add("content-hidden");
-}
-
-/** 清理动画结束后的状态 */
-function cleanupAnimation() {
-    articleAnimation = null;
 }
 
 function openArticle(
@@ -848,11 +866,8 @@ function openArticle(
     date,
     category
 ) {
-    // 如果正在动画中，先取消当前动画
-    if (articleAnimation) {
-        articleAnimation.cancel();
-        articleAnimation = null;
-    }
+    // 取消所有正在运行的动画
+    cancelAllAnimations();
 
     activeCard = card;
     currentPostId = postId;
@@ -878,81 +893,133 @@ function openArticle(
     viewBody.innerHTML = enhancedHtml;
     enhanceMarkdownDom(viewBody);
 
-    const cardRect = card.getBoundingClientRect();
+    // 第一步：卡片按压反馈（80ms）
+    card.style.transition = "transform 80ms ease";
+    card.style.transform = "scale(0.96)";
 
-    // 进入文章模式
-    document.body.classList.add("article-mode");
-    overlay.classList.add("active");
-    document.body.style.overflow = "hidden";
-    card.classList.add("morph-hidden");
+    pressTimer = setTimeout(() => {
+        // 恢复卡片
+        card.style.transition = "";
+        card.style.transform = "";
 
-    // 内容先隐藏
-    articleContent.classList.remove("content-visible");
-    articleContent.classList.add("content-hidden");
+        const cardRect = card.getBoundingClientRect();
 
-    // 设置初始状态
-    articlePage.style.transition = "none";
-    const startTransform = `translate3d(${cardRect.left}px, ${cardRect.top}px, 0) scale(${cardRect.width / window.innerWidth}, ${cardRect.height / window.innerHeight})`;
-    articlePage.style.transform = startTransform;
-    articlePage.style.borderRadius = "26px";
-    articlePage.style.opacity = "1";
+        // 进入文章模式
+        document.body.classList.add("article-mode");
+        overlay.classList.add("active");
+        document.body.style.overflow = "hidden";
+        card.classList.add("morph-hidden");
 
-    // 强制重排
-    articlePage.getBoundingClientRect();
+        // 内容先隐藏
+        articleContent.classList.remove("content-visible");
+        articleContent.classList.add("content-hidden");
 
-    // 使用 Web Animations API 播放动画（支持打断/反向）
-    articleAnimation = articlePage.animate(
-        buildCardToFullscreenKeyframes(cardRect),
-        {
-            duration: ANIMATION_DURATION,
-            easing: ANIMATION_EASING,
-            fill: "forwards"
-        }
-    );
+        // 设置 articlePage 初始状态：从卡片位置开始
+        articlePage.style.transition = "none";
+        const startTransform = `translate3d(${cardRect.left}px, ${cardRect.top}px, 0) scale(${cardRect.width / window.innerWidth}, ${cardRect.height / window.innerHeight})`;
+        articlePage.style.transform = startTransform;
+        articlePage.style.borderRadius = "26px";
+        articlePage.style.opacity = "1";
 
-    // 动画进行到一定程度时淡入内容
-    showArticleContent();
+        // 强制重排
+        articlePage.getBoundingClientRect();
 
-    articleAnimation.onfinish = () => {
-        // 动画结束后将样式固化到元素上
-        articlePage.style.transform = "translate3d(0,0,0) scale(1,1)";
-        articlePage.style.borderRadius = "0px";
-        cleanupAnimation();
-    };
+        // 背景变暗动画（前 280ms 完成）
+        overlay.style.background = "rgba(0,0,0,0)";
+        bgAnimation = overlay.animate(
+            [
+                { background: "rgba(0,0,0,0)" },
+                { background: BG_DARKEN }
+            ],
+            {
+                duration: 280,
+                easing: "ease-out",
+                fill: "forwards"
+            }
+        );
+
+        // 卡片展开动画（480ms easeOutCubic）
+        articleAnimation = articlePage.animate(
+            [
+                { transform: startTransform, borderRadius: "26px" },
+                { transform: "translate3d(0,0,0) scale(1,1)", borderRadius: "0px" }
+            ],
+            {
+                duration: OPEN_DURATION,
+                easing: EASE_OUT_CUBIC,
+                fill: "forwards"
+            }
+        );
+
+        // 280ms 后内容淡入
+        showArticleContent();
+
+        articleAnimation.onfinish = () => {
+            // 动画结束后固化样式
+            articlePage.style.transform = "translate3d(0,0,0) scale(1,1)";
+            articlePage.style.borderRadius = "0px";
+            overlay.style.background = BG_DARKEN;
+            articleAnimation = null;
+            bgAnimation = null;
+        };
+
+        pressTimer = null;
+    }, 80);
 }
 
 
 function closeArticle() {
     if (!activeCard) return;
 
-    // 如果正在播放打开动画，直接反向播放（实现打断）
+    // 如果有按压定时器在运行（刚点击还没开始展开），直接取消
+    if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+        activeCard.style.transform = "";
+        activeCard = null;
+        currentPostId = "";
+        return;
+    }
+
+    // 如果正在播放打开动画，反向播放两个动画（实现打断）
     if (articleAnimation) {
         articleAnimation.reverse();
+        if (bgAnimation) bgAnimation.reverse();
         hideArticleContent();
+
         articleAnimation.onfinish = () => {
             finishCloseArticle();
         };
         return;
     }
 
-    // 正常关闭：从全屏动画回卡片位置
+    // 正常关闭
     hideArticleContent();
 
     const cardRect = activeCard.getBoundingClientRect();
 
-    articlePage.style.transition = "none";
-    articlePage.style.transform = "translate3d(0,0,0) scale(1,1)";
-    articlePage.style.borderRadius = "0px";
-    articlePage.getBoundingClientRect();
+    // 背景消退动画
+    bgAnimation = overlay.animate(
+        [
+            { background: BG_DARKEN },
+            { background: "rgba(0,0,0,0)" }
+        ],
+        {
+            duration: CLOSE_DURATION,
+            easing: "ease-in",
+            fill: "forwards"
+        }
+    );
 
+    // 页面收缩动画（420ms easeInOutCubic）
     articleAnimation = articlePage.animate(
         [
             { transform: "translate3d(0,0,0) scale(1,1)", borderRadius: "0px" },
             { transform: `translate3d(${cardRect.left}px, ${cardRect.top}px, 0) scale(${cardRect.width / window.innerWidth}, ${cardRect.height / window.innerHeight})`, borderRadius: "26px" }
         ],
         {
-            duration: ANIMATION_DURATION,
-            easing: ANIMATION_EASING,
+            duration: CLOSE_DURATION,
+            easing: EASE_IN_OUT_CUBIC,
             fill: "forwards"
         }
     );
@@ -965,15 +1032,18 @@ function closeArticle() {
 /** 关闭动画结束后的清理 */
 function finishCloseArticle() {
     overlay.classList.remove("active");
+    overlay.style.background = "";
     document.body.classList.remove("article-mode");
     if (activeCard) {
         activeCard.classList.remove("morph-hidden");
+        activeCard.style.transform = "";
     }
     articlePage.style.transition = "none";
     articlePage.style.transform = "translate3d(0,0,0) scale(1)";
     articlePage.style.borderRadius = "0px";
     document.body.style.overflow = "";
-    cleanupAnimation();
+    articleAnimation = null;
+    bgAnimation = null;
     activeCard = null;
     currentPostId = "";
     history.replaceState(null, "", window.location.pathname);

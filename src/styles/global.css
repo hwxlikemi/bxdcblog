@@ -1065,8 +1065,11 @@
             visibility: hidden;
             opacity: 0;
 
+            background: rgba(0,0,0,0);
+
             transition:
-                opacity 160ms ease;
+                opacity 160ms ease,
+                visibility 160ms ease;
         }
 
         #articleOverlay.active {
@@ -1259,11 +1262,11 @@
 
         .article-action-bar {
         position: fixed;
-        right: 30px;
-        bottom: 30px;
+        right: 24px;
+        bottom: 88px;
 
         display: flex;
-        flex-direction: row;
+        flex-direction: column;
         gap: 12px;
 
         align-items: center;
@@ -2291,13 +2294,15 @@
                 right: 16px;
                 left: auto;
                 top: auto;
-                bottom: 24px;
+                bottom: 80px;
                 justify-content: center;
-                flex-direction: row;
+                flex-direction: column;
+                gap: 12px;
             }
 
             body.article-mode .floating-controls {
-                bottom: 84px;
+                bottom: 16px !important;
+                right: 16px !important;
             }
 
             .article-action-bar .glass-circle-btn {
@@ -2848,4 +2853,41 @@
 
         .playlist-item.active .playlist-item-play {
             color: #0284c7;
+        }
+
+        /* =========================================================
+           36. 文章动效增强（iOS26 卡片 Morph）
+        ========================================================= */
+
+        /* 按钮依次弹入：评论 160ms，分享 80ms */
+        #articleOverlay.active .article-action-bar .action-btn-item:nth-child(1) {
+            animation: buttonPopIn 380ms cubic-bezier(0.34, 1.56, 0.64, 1) 160ms both;
+        }
+        #articleOverlay.active .article-action-bar .action-btn-item:nth-child(2) {
+            animation: buttonPopIn 380ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms both;
+        }
+        @keyframes buttonPopIn {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.12); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 文章模式下音乐按钮移到分享下方，隐藏返回顶部，音乐按钮弹入 */
+        body.article-mode .floating-controls {
+            bottom: 24px !important;
+            right: 24px !important;
+        }
+        body.article-mode .floating-controls #scrollTopBtn {
+            display: none;
+        }
+        body.article-mode .floating-controls #musicToggleBtn {
+            animation: buttonPopIn 380ms cubic-bezier(0.34, 1.56, 0.64, 1) 0ms both;
+        }
+
+        /* 按钮点击反馈 */
+        .article-action-bar .glass-circle-btn:active {
+            transform: scale(0.92);
+        }
+        .floating-controls .float-btn:active {
+            transform: scale(0.90);
         }
