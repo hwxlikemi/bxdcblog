@@ -1,3 +1,9 @@
+---
+import { siteConfig } from "../config";
+
+const twikooAdminUrl = siteConfig.twikoo.envId.replace(/\/$/, "");
+---
+
 <div id="commentPageOverlay">
 
     <div 
@@ -61,12 +67,26 @@
 
 
 
-                <div
+                <a
+                    class="glass-circle-btn"
+                    href={twikooAdminUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="评论管理"
                     style="
                         width:44px;
                         height:44px;
+                        font-size:1rem;
+                        text-decoration:none;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
                     "
-                ></div>
+                >
+
+                    <i class="fa-solid fa-gear"></i>
+
+                </a>
 
 
             </div>

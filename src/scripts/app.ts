@@ -671,6 +671,9 @@ let activeCard = null;
 
 let isAnimating = false;
 
+/** 当前打开的文章 ID，用于区分不同文章的评论 */
+let currentPostId = "";
+
 const overlay =
     document.getElementById(
         "articleOverlay"
@@ -699,6 +702,7 @@ const mainWrapper =
 
 function openArticle(
     card,
+    postId,
     title,
     date,
     category,
@@ -715,6 +719,14 @@ function openArticle(
 
     activeCard =
         card;
+
+    // 记录当前文章 ID，用于评论区分
+    currentPostId = postId;
+
+    // 更新 URL hash，刷新后能恢复文章状态，也方便分享链接
+    if (postId) {
+        history.replaceState(null, "", `#post-${postId}`);
+    }
 
     document.getElementById(
         "viewTitle"
@@ -908,6 +920,10 @@ function closeArticle() {
 
             isAnimating = false;
             activeCard = null;
+            currentPostId = "";
+
+            // 清除 hash
+            history.replaceState(null, "", window.location.pathname);
         },
         400
     );
@@ -1368,7 +1384,7 @@ async function sendComment() {
 
         await submitComment({
 
-            url: window.location.pathname,
+            url: currentPostId || window.location.pathname,
             nick: name,
             mail: email,
             comment: val,
@@ -1524,7 +1540,7 @@ async function loadTwikooComments() {
 
     try {
         const result = await fetchComments({
-            url: window.location.pathname,
+            url: currentPostId || window.location.pathname,
         });
 
         const comments: TwikooComment[] = result.data || [];
@@ -1631,6 +1647,7 @@ document.querySelectorAll(".post-card").forEach((card) => {
         const el = card as HTMLElement;
         openArticle(
             el,
+            el.dataset.postId || "",
             el.dataset.title || "",
             el.dataset.date || "",
             el.dataset.category || "",
@@ -1656,4 +1673,33 @@ document.querySelectorAll("img[data-fallback]").forEach((img) => {
             element.src = fallback;
         }
     }, { once: true });
+});
+
+/* ================================================================
+   17. URL Hash 同步
+   打开文章时写入 #post-xxx，刷新/分享链接后能自动恢复。
+================================================================ */
+
+function openArticleByHash() {
+    const match = window.location.hash.match(/^#post-(.+)$/);
+    if (!match) return;
+
+    const postId = match[1];
+    const card = document.querySelector(`.post-card[data-post-id="${postId}"]`) as HTMLElement;
+    if (card) {
+        // 延迟一帧，确保 DOM 和样式就绪
+        requestAnimationFrame(() => card.click());
+    }
+}
+
+// 页面加载时恢复
+window.addEventListener("load", openArticleByHash);
+
+// 监听浏览器前进/后退
+window.addEventListener("hashchange", () => {
+    if (window.location.hash) {
+        openArticleByHash();
+    } else if (overlay?.classList.contains("active")) {
+        closeArticle();
+    }
 });
