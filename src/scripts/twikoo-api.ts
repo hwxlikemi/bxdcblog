@@ -1,109 +1,27 @@
 import { siteConfig } from "../config";
 
 
-let twikooLoaded = false;
+/**
+ * Twikoo API
+ *
+ * 保留自定义评论 UI
+ * 不加载 Twikoo 默认组件
+ */
 
 
-function loadTwikoo(){
-
-    return new Promise<any>(
-        (resolve,reject)=>{
-
-
-            if(
-                (window as any).twikoo
-            ){
-
-                resolve(
-                    (window as any).twikoo
-                );
-
-                return;
-
-            }
-
-
-
-            const script =
-            document.createElement(
-                "script"
-            );
-
-
-            script.src =
-            "https://cdn.jsdelivr.net/npm/twikoo/dist/twikoo.all.min.js";
-
-
-            script.onload =
-            ()=>{
-
-                twikooLoaded = true;
-
-
-                resolve(
-                    (window as any).twikoo
-                );
-
-            };
-
-
-            script.onerror =
-            reject;
-
-
-            document.head.appendChild(
-                script
-            );
-
-
-        }
-    );
-
-}
-
-
-
-async function getTwikoo(){
-
-    if(
-        twikooLoaded &&
-        (window as any).twikoo
-    ){
-
-        return (window as any).twikoo;
-
-    }
-
-
-    return await loadTwikoo();
-
-}
-
+const envId =
+    siteConfig.twikoo.envId.replace(/\/$/, "");
 
 
 
 /**
- * 初始化 Twikoo
+ * 获取 Twikoo 云函数地址
  */
-export async function initTwikoo(){
+function apiUrl(){
 
-    const twikoo =
-        await getTwikoo();
-
-
-    return twikoo.init({
-
-        envId:
-        siteConfig.twikoo.envId.replace(/\/$/,""),
-
-        path:
-        window.location.pathname
-
-    });
+    return `${envId}/api/comment`;
 
 }
-
-
 
 
 
@@ -114,36 +32,149 @@ export async function submitComment(
     data:any
 ){
 
-    await initTwikoo();
+    const body = {
+
+        event:"COMMENT_CREATE",
+
+        data:{
+
+            nick:data.nick,
+
+            mail:data.mail,
+
+            comment:data.comment,
+
+            url:
+            window.location.pathname
+
+        }
+
+    };
 
 
-    console.log(
-        "准备提交评论:",
-        data
-    );
+    const res =
+        await fetch(
+            apiUrl(),
+            {
+
+                method:"POST",
+
+                headers:{
+                    "Content-Type":
+                    "application/json"
+                },
+
+                body:
+                JSON.stringify(body)
+
+            }
+        );
 
 
-    return true;
+    if(!res.ok){
+
+        throw new Error(
+            "评论提交失败"
+        );
+
+    }
+
+
+    return await res.json();
 
 }
 
 
 
 
-
 /**
- * 获取评论
+ * 获取评论列表
  */
 export async function fetchComments(){
 
-    await initTwikoo();
+    const body = {
+
+        event:"COMMENT_GET",
+
+        data:{
+
+            url:
+            window.location.pathname
+
+        }
+
+    };
 
 
-    console.log(
-        "加载评论"
-    );
+    const res =
+        await fetch(
+            apiUrl(),
+            {
+
+                method:"POST",
+
+                headers:{
+                    "Content-Type":
+                    "application/json"
+                },
 
 
-    return true;
+                body:
+                JSON.stringify(body)
+
+            }
+        );
+
+
+
+    if(!res.ok){
+
+        throw new Error(
+            "评论加载失败"
+        );
+
+    }
+
+
+
+    const result =
+        await res.json();
+
+
+
+    /**
+     * 兼容 Twikoo 返回格式
+     */
+    if(
+        Array.isArray(result)
+    ){
+
+        return result;
+
+    }
+
+
+
+    if(
+        Array.isArray(result.data)
+    ){
+
+        return result.data;
+
+    }
+
+
+
+    if(
+        Array.isArray(result.comments)
+    ){
+
+        return result.comments;
+
+    }
+
+
+
+    return [];
 
 }
