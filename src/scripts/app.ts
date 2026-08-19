@@ -779,8 +779,6 @@ let currentPostId = "";
 
 /** 页面变形动画 */
 let articleAnimation = null;
-/** 背景变暗动画 */
-let bgAnimation = null;
 /** 内容淡入定时器 */
 let contentFadeTimer = null;
 /** 按压定时器 */
@@ -816,7 +814,6 @@ const OPEN_DURATION = 480;
 const CLOSE_DURATION = 420;
 const EASE_OUT_CUBIC = "cubic-bezier(0.33, 1, 0.68, 1)";
 const EASE_IN_OUT_CUBIC = "cubic-bezier(0.65, 0, 0.35, 1)";
-const BG_DARKEN = "rgba(0,0,0,0.45)";
 const CONTENT_FADE_DELAY = 280;
 
 /** 取消所有正在运行的动画 */
@@ -824,10 +821,6 @@ function cancelAllAnimations() {
     if (articleAnimation) {
         articleAnimation.cancel();
         articleAnimation = null;
-    }
-    if (bgAnimation) {
-        bgAnimation.cancel();
-        bgAnimation = null;
     }
     if (contentFadeTimer) {
         clearTimeout(contentFadeTimer);
@@ -924,21 +917,8 @@ function openArticle(
         // 强制重排
         articlePage.getBoundingClientRect();
 
-        // 背景变暗动画（前 280ms 完成）
-        overlay.style.background = "rgba(0,0,0,0)";
-        bgAnimation = overlay.animate(
-            [
-                { background: "rgba(0,0,0,0)" },
-                { background: BG_DARKEN }
-            ],
-            {
-                duration: 280,
-                easing: "ease-out",
-                fill: "forwards"
-            }
-        );
-
         // 卡片展开动画（480ms easeOutCubic）
+        // 背景变暗由 CSS body.article-mode #mainWrapper filter: brightness(0.55) 实现
         articleAnimation = articlePage.animate(
             [
                 { transform: startTransform, borderRadius: "26px" },
@@ -958,9 +938,7 @@ function openArticle(
             // 动画结束后固化样式
             articlePage.style.transform = "translate3d(0,0,0) scale(1,1)";
             articlePage.style.borderRadius = "0px";
-            overlay.style.background = BG_DARKEN;
             articleAnimation = null;
-            bgAnimation = null;
         };
 
         pressTimer = null;
@@ -981,10 +959,10 @@ function closeArticle() {
         return;
     }
 
-    // 如果正在播放打开动画，反向播放两个动画（实现打断）
+    // 如果正在播放打开动画，反向播放（实现打断）
+    // 背景变暗由 CSS mainWrapper filter 自动反向过渡
     if (articleAnimation) {
         articleAnimation.reverse();
-        if (bgAnimation) bgAnimation.reverse();
         hideArticleContent();
 
         articleAnimation.onfinish = () => {
@@ -997,19 +975,6 @@ function closeArticle() {
     hideArticleContent();
 
     const cardRect = activeCard.getBoundingClientRect();
-
-    // 背景消退动画
-    bgAnimation = overlay.animate(
-        [
-            { background: BG_DARKEN },
-            { background: "rgba(0,0,0,0)" }
-        ],
-        {
-            duration: CLOSE_DURATION,
-            easing: "ease-in",
-            fill: "forwards"
-        }
-    );
 
     // 页面收缩动画（420ms easeInOutCubic）
     articleAnimation = articlePage.animate(
@@ -1032,7 +997,6 @@ function closeArticle() {
 /** 关闭动画结束后的清理 */
 function finishCloseArticle() {
     overlay.classList.remove("active");
-    overlay.style.background = "";
     document.body.classList.remove("article-mode");
     if (activeCard) {
         activeCard.classList.remove("morph-hidden");
@@ -1043,7 +1007,6 @@ function finishCloseArticle() {
     articlePage.style.borderRadius = "0px";
     document.body.style.overflow = "";
     articleAnimation = null;
-    bgAnimation = null;
     activeCard = null;
     currentPostId = "";
     history.replaceState(null, "", window.location.pathname);
