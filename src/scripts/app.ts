@@ -770,405 +770,271 @@ document
 
 /* ================================================================
    6. 文章卡片 Morph 动画
-   iOS26 Liquid Glass 同源连续形变版
+   iOS26 Liquid Glass Shared-Element Morph
 
-   核心：
-   1. 动画源严格来自被点击文章卡片的真实 viewport 几何位置。
-   2. 不使用 transform: scale() 缩放整页，避免文字/图片被拉伸。
-   3. 使用 left / top / width / height / border-radius 连续形变。
-   4. 背景暗化延迟于容器扩张。
-   5. 文章内容独立淡入。
-   6. 支持打开/关闭过程中途打断。
+   关键参数：
+   - OPEN_DURATION / CLOSE_DURATION：总时长 300ms
+   - BACKGROUND_DELAY：背景滞后 55ms
+   - CONTENT_FADE_DELAY：App 内容约 165ms 开始进入
+   - CARD_RADIUS：源卡片圆角 26px
+   - OVERSHOOT：末尾仅约 0.7% 的弱弹簧过冲
+
+   视觉结构：
+   源卡片 → Liquid Glass Morph 层 → 全屏 Article
+   而不是简单 scale 一个页面。
    ================================================================ */
 
 let activeCard = null;
 let currentPostId = "";
 let articleAnimation = null;
+let glassAnimation = null;
 let backgroundAnimation = null;
 let contentFadeTimer = null;
 let pressAnimation = null;
 let articleMorphDirection = null;
 
-const overlay =
-    document.getElementById("articleOverlay");
+const overlay = document.getElementById("articleOverlay");
+const articlePage = document.getElementById("articlePage");
+const articleContent = document.getElementById("articleContent");
+const backBtn = document.getElementById("backBtn");
+const mainWrapper = document.getElementById("mainWrapper");
 
-const articlePage =
-    document.getElementById("articlePage");
-
-const articleContent =
-    document.getElementById("articleContent");
-
-const backBtn =
-    document.getElementById("backBtn");
-
-const mainWrapper =
-    document.getElementById("mainWrapper");
-
-
-/* ================================================================
-   iOS26 Morph 核心参数
-   ================================================================ */
-
-/** 动画总时长：打开 300ms */
 const OPEN_DURATION = 300;
-
-/** 动画总时长：返回 300ms */
 const CLOSE_DURATION = 300;
-
-/** 点击瞬间轻微按压 */
-const PRESS_DURATION = 70;
-
-/**
- * 背景暗化时间偏移：
- * 容器先开始扩张，55ms 后背景才跟进。
- */
+const PRESS_DURATION = 72;
 const BACKGROUND_DELAY = 55;
-
-/** 背景暗化总时长 */
-const BACKGROUND_DURATION = 220;
-
-/**
- * 文章内容开始淡入：
- * 容器已经完成主要扩张之后再进入。
- */
-const CONTENT_FADE_DELAY = 175;
-
-/** 首页文章卡片默认圆角 */
+const BACKGROUND_DURATION = 230;
+const CONTENT_FADE_DELAY = 165;
+const SOURCE_FADE_TIME = 145;
 const CARD_RADIUS = 26;
+const FULL_RADIUS = 0;
+const OVERSHOOT = 1.007;
 
-/** 全屏文章圆角 */
-const FINAL_RADIUS = 0;
+const LIQUID_SPRING =
+    "linear(0, .10 7%, .25 18%, .48 35%, .70 53%, .85 69%, .94 82%, .992 91%, 1.007 96%, .999 99%, 1 100%)";
 
-/**
- * 极弱弹簧过冲。
- * 0.8% 只提供“液态玻璃落位”的微妙感觉。
- */
-const SPRING_OVERSHOOT = 1.008;
+const LIQUID_CLOSE =
+    "linear(0, .015 6%, .09 17%, .25 34%, .48 53%, .68 70%, .84 84%, .95 94%, 1 100%)";
 
-/**
- * 高阻尼弱弹簧。
- * 末尾仅有极轻微过冲，禁止夸张弹跳。
- */
-const LIQUID_SPRING_EASE =
-    "linear(" +
-    "0, " +
-    "0.12 8%, " +
-    "0.30 20%, " +
-    "0.56 40%, " +
-    "0.76 60%, " +
-    "0.90 76%, " +
-    "0.975 88%, " +
-    "1.008 96%, " +
-    "0.999 99%, " +
-    "1 100%" +
-    ")";
+function ensureLiquidGlassLayer() {
+    if (document.getElementById("ios26MorphGlassStyle")) return;
 
-const LIQUID_CLOSE_EASE =
-    "linear(" +
-    "0, " +
-    "0.02 5%, " +
-    "0.10 15%, " +
-    "0.28 32%, " +
-    "0.52 52%, " +
-    "0.74 70%, " +
-    "0.90 86%, " +
-    "0.98 96%, " +
-    "1 100%" +
-    ")";
+    const style = document.createElement("style");
+    style.id = "ios26MorphGlassStyle";
+    style.textContent = `
+        #ios26MorphGlass {
+            position: fixed;
+            z-index: 99999;
+            left: 0;
+            top: 0;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+            pointer-events: none;
+            box-sizing: border-box;
+            border: 1px solid rgba(255,255,255,.22);
+            background:
+                linear-gradient(135deg,
+                    rgba(255,255,255,.30),
+                    rgba(255,255,255,.10) 42%,
+                    rgba(255,255,255,.035));
+            backdrop-filter: blur(24px) saturate(1.25);
+            -webkit-backdrop-filter: blur(24px) saturate(1.25);
+            box-shadow:
+                0 18px 55px rgba(0,0,0,.18),
+                inset 0 1px 0 rgba(255,255,255,.34),
+                inset 0 -1px 0 rgba(255,255,255,.08);
+            will-change:
+                left, top, width, height, border-radius,
+                opacity, filter, box-shadow;
+        }
 
+        #ios26MorphGlass::before {
+            content: "";
+            position: absolute;
+            inset: -50%;
+            border-radius: inherit;
+            background:
+                radial-gradient(ellipse at 20% 12%,
+                    rgba(255,255,255,.62) 0%,
+                    rgba(255,255,255,.20) 17%,
+                    transparent 48%);
+            transform: translate3d(-12%,-7%,0) rotate(-8deg);
+            opacity: .78;
+            will-change: transform, opacity;
+        }
 
-interface ArticleRect {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
+        #ios26MorphGlass::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background:
+                linear-gradient(112deg,
+                    transparent 0%,
+                    transparent 34%,
+                    rgba(255,255,255,.30) 45%,
+                    rgba(255,255,255,.08) 51%,
+                    transparent 63%);
+            transform: translate3d(-78%,0,0);
+            opacity: .72;
+            will-change: transform, opacity;
+        }
+
+        body.ios26-liquid-morphing #articleOverlay {
+            background: transparent !important;
+        }
+
+        body.ios26-liquid-opening #articleContent {
+            opacity: 0 !important;
+            transform: translate3d(0,10px,0) scale(.985);
+        }
+
+        body.ios26-liquid-opened #articleContent {
+            opacity: 1 !important;
+            transform: translate3d(0,0,0) scale(1);
+            transition:
+                opacity 130ms cubic-bezier(.22,1,.36,1),
+                transform 170ms cubic-bezier(.22,1,.36,1);
+        }
+
+        .post-card.ios26-morph-source {
+            z-index: 100000 !important;
+            transform: translate3d(0,1px,0) scale(.975) !important;
+            filter: brightness(1.06) saturate(1.08);
+            transition: none !important;
+        }
+
+        .post-card.ios26-morph-source-hidden {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            transition: none !important;
+        }
+    `;
+    document.head.appendChild(style);
 }
 
-
-/* ================================================================
-   工具：取消当前 Morph 动画
-   ================================================================ */
-
-function cancelAllArticleAnimations() {
-
-    if (articleAnimation) {
-        articleAnimation.cancel();
-        articleAnimation = null;
-    }
-
-    if (backgroundAnimation) {
-        backgroundAnimation.cancel();
-        backgroundAnimation = null;
-    }
-
-    if (pressAnimation) {
-        pressAnimation.cancel();
-        pressAnimation = null;
-    }
-
-    if (contentFadeTimer) {
-        clearTimeout(contentFadeTimer);
-        contentFadeTimer = null;
-    }
+function cancelAllAnimations() {
+    if (articleAnimation) articleAnimation.cancel();
+    if (glassAnimation) glassAnimation.cancel();
+    if (backgroundAnimation) backgroundAnimation.cancel();
+    if (pressAnimation) pressAnimation.cancel();
+    if (contentFadeTimer) clearTimeout(contentFadeTimer);
+    articleAnimation = null;
+    glassAnimation = null;
+    backgroundAnimation = null;
+    pressAnimation = null;
+    contentFadeTimer = null;
 }
-
-
-/* ================================================================
-   工具：读取文章卡片真实 viewport 几何位置
-   ================================================================ */
 
 function getCardRect(card) {
-
-    const rect =
-        card.getBoundingClientRect();
-
+    const r = card.getBoundingClientRect();
     return {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height
     };
 }
 
-
-/* ================================================================
-   工具：设置文章容器几何位置
-   ================================================================ */
-
-function setArticleGeometry(rect) {
-
-    articlePage.style.left =
-        `${rect.left}px`;
-
-    articlePage.style.top =
-        `${rect.top}px`;
-
-    articlePage.style.width =
-        `${rect.width}px`;
-
-    articlePage.style.height =
-        `${rect.height}px`;
-}
-
-
-/* ================================================================
-   工具：设置文章容器全屏状态
-   ================================================================ */
-
-function setArticleFullscreen() {
-
-    articlePage.style.left = "0px";
-    articlePage.style.top = "0px";
-    articlePage.style.width = "100vw";
-    articlePage.style.height = "100vh";
-}
-
-
-/* ================================================================
-   工具：恢复 articlePage 最终 CSS 状态
-   ================================================================ */
-
-function resetArticleGeometry() {
-
-    setArticleFullscreen();
-
-    articlePage.style.borderRadius =
-        `${FINAL_RADIUS}px`;
-
-    articlePage.style.opacity = "1";
-    articlePage.style.overflowY = "";
-    articlePage.style.visibility = "";
-}
-
-
-/* ================================================================
-   工具：隐藏文章内容
-   ================================================================ */
-
 function hideArticleContent() {
-
-    if (contentFadeTimer) {
-        clearTimeout(contentFadeTimer);
-        contentFadeTimer = null;
-    }
-
+    if (contentFadeTimer) clearTimeout(contentFadeTimer);
     articleContent.classList.remove("content-visible");
     articleContent.classList.add("content-hidden");
 }
 
-
-/* ================================================================
-   工具：延迟显示文章内容
-   ================================================================ */
-
-function scheduleArticleContent() {
-
-    if (contentFadeTimer) {
-        clearTimeout(contentFadeTimer);
-    }
-
-    contentFadeTimer =
-        setTimeout(() => {
-
-            articleContent.classList.remove(
-                "content-hidden"
-            );
-
-            articleContent.classList.add(
-                "content-visible"
-            );
-
-            contentFadeTimer = null;
-
-        }, CONTENT_FADE_DELAY);
+function showArticleContent() {
+    if (contentFadeTimer) clearTimeout(contentFadeTimer);
+    contentFadeTimer = setTimeout(() => {
+        if (articleMorphDirection !== "open") return;
+        articleContent.classList.remove("content-hidden");
+        articleContent.classList.add("content-visible");
+        document.body.classList.remove("ios26-liquid-opening");
+        document.body.classList.add("ios26-liquid-opened");
+        contentFadeTimer = null;
+    }, CONTENT_FADE_DELAY);
 }
 
-
-/* ================================================================
-   0 - 70ms：卡片轻微按压
-   ================================================================ */
-
-function playCardPress(card) {
-
-    if (pressAnimation) {
-        pressAnimation.cancel();
-    }
-
-    pressAnimation =
-        card.animate(
-            [
-                {
-                    transform:
-                        "translate3d(0,0,0) scale(1)"
-                },
-                {
-                    transform:
-                        "translate3d(0,0,0) scale(0.975)"
-                },
-                {
-                    transform:
-                        "translate3d(0,0,0) scale(1)"
-                }
-            ],
-            {
-                duration: PRESS_DURATION,
-                easing:
-                    "cubic-bezier(0.2,0.8,0.2,1)",
-                fill: "forwards"
-            }
-        );
+function pressCard(card) {
+    pressAnimation = card.animate([
+        {
+            transform: "translate3d(0,0,0) scale(1)",
+            filter: "brightness(1) saturate(1)"
+        },
+        {
+            transform: "translate3d(0,1px,0) scale(.972)",
+            filter: "brightness(1.06) saturate(1.08)"
+        },
+        {
+            transform: "translate3d(0,0,0) scale(.985)",
+            filter: "brightness(1.02) saturate(1.04)"
+        }
+    ], {
+        duration: PRESS_DURATION,
+        easing: "cubic-bezier(.22,1,.36,1)",
+        fill: "forwards"
+    });
 }
-
-
-/* ================================================================
-   55ms 后：背景开始滞后暗化
-   ================================================================ */
 
 function animateBackgroundOpen() {
-
-    if (!mainWrapper) {
-        return;
-    }
-
-    if (backgroundAnimation) {
-        backgroundAnimation.cancel();
-    }
-
-    backgroundAnimation =
-        mainWrapper.animate(
-            [
-                {
-                    filter: "brightness(1)"
-                },
-                {
-                    filter: "brightness(0.55)"
-                }
-            ],
-            {
-                duration: BACKGROUND_DURATION,
-                delay: BACKGROUND_DELAY,
-                easing: "ease-out",
-                fill: "forwards"
-            }
-        );
+    if (!mainWrapper) return;
+    backgroundAnimation = mainWrapper.animate([
+        { filter: "brightness(1) saturate(1)" },
+        { filter: "brightness(.88) saturate(.98)", offset: .20 },
+        { filter: "brightness(.58) saturate(.88)" }
+    ], {
+        duration: BACKGROUND_DURATION,
+        delay: BACKGROUND_DELAY,
+        easing: "cubic-bezier(.22,1,.36,1)",
+        fill: "forwards"
+    });
 }
-
-
-/* ================================================================
-   返回：背景恢复
-   ================================================================ */
 
 function animateBackgroundClose() {
-
-    if (!mainWrapper) {
-        return;
-    }
-
-    if (backgroundAnimation) {
-        backgroundAnimation.cancel();
-    }
-
-    backgroundAnimation =
-        mainWrapper.animate(
-            [
-                {
-                    filter: "brightness(0.55)"
-                },
-                {
-                    filter: "brightness(1)"
-                }
-            ],
-            {
-                duration: BACKGROUND_DURATION,
-                delay: 20,
-                easing: "ease-out",
-                fill: "forwards"
-            }
-        );
+    if (!mainWrapper) return;
+    backgroundAnimation = mainWrapper.animate([
+        { filter: "brightness(.58) saturate(.88)" },
+        { filter: "brightness(.86) saturate(.98)", offset: .72 },
+        { filter: "brightness(1) saturate(1)" }
+    ], {
+        duration: BACKGROUND_DURATION,
+        easing: "cubic-bezier(.22,1,.36,1)",
+        fill: "forwards"
+    });
 }
 
+function createGlass(rect) {
+    const old = document.getElementById("ios26MorphGlass");
+    if (old) old.remove();
 
-/* ================================================================
-   打开文章
-   ================================================================ */
+    const glass = document.createElement("div");
+    glass.id = "ios26MorphGlass";
+    glass.style.left = `${rect.left}px`;
+    glass.style.top = `${rect.top}px`;
+    glass.style.width = `${rect.width}px`;
+    glass.style.height = `${rect.height}px`;
+    glass.style.borderRadius = `${CARD_RADIUS}px`;
+    document.body.appendChild(glass);
+    return glass;
+}
 
-function openArticle(
-    card,
-    postId,
-    title,
-    date,
-    category
-) {
+function openArticle(card, postId, title, date, category) {
+    if (!card || !articlePage || !overlay) return;
 
-    if (
-        !card ||
-        !articlePage ||
-        !overlay
-    ) {
-        return;
-    }
-
-    cancelAllArticleAnimations();
+    ensureLiquidGlassLayer();
+    cancelAllAnimations();
 
     activeCard = card;
     currentPostId = postId;
     articleMorphDirection = "open";
 
-    if (postId) {
-        history.replaceState(
-            null,
-            "",
-            `#post-${postId}`
-        );
-    }
+    const source = getCardRect(card);
 
-    document.getElementById(
-        "viewTitle"
-    ).innerText = title;
+    if (postId) history.replaceState(null, "", `#post-${postId}`);
 
-    document.getElementById(
-        "viewMeta"
-    ).innerHTML = `
+    document.getElementById("viewTitle").innerText = title;
+    document.getElementById("viewMeta").innerHTML = `
         <i class="fa-regular fa-calendar"></i>
         ${date}
         &nbsp;&nbsp;|&nbsp;&nbsp;
@@ -1176,417 +1042,259 @@ function openArticle(
         ${category}
     `;
 
-    /* ------------------------------------------------------------
-       从卡片 template 读取文章 HTML
-       ------------------------------------------------------------ */
-
-    const template =
-        card.querySelector(
-            "template[data-post-html]"
-        );
-
-    const rawHtml =
-        template
-            ? template.innerHTML
-            : "";
-
-    const enhancedHtml =
-        enhanceMarkdownHtml(rawHtml);
-
-    const viewBody =
-        document.getElementById("viewBody");
-
-    viewBody.innerHTML =
-        enhancedHtml;
-
+    const template = card.querySelector("template[data-post-html]");
+    const rawHtml = template ? template.innerHTML : "";
+    const viewBody = document.getElementById("viewBody");
+    viewBody.innerHTML = enhanceMarkdownHtml(rawHtml);
     enhanceMarkdownDom(viewBody);
 
-
-    /* ------------------------------------------------------------
-       最关键的一步：
-
-       必须在隐藏原卡片之前读取真实位置。
-
-       这就是同源液态 Morph 的源锚点。
-       ------------------------------------------------------------ */
-
-    const sourceRect =
-        getCardRect(card);
-
-
-    /* ------------------------------------------------------------
-       0ms：点击反馈
-       ------------------------------------------------------------ */
-
-    playCardPress(card);
-
-
-    /* ------------------------------------------------------------
-       进入文章模式
-       ------------------------------------------------------------ */
-
-    document.body.classList.add(
-        "article-mode"
-    );
-
-    overlay.classList.add(
-        "active"
-    );
-
-    document.body.style.overflow =
-        "hidden";
-
-
-    /* ------------------------------------------------------------
-       原卡片隐藏，但不删除。
-
-       articlePage 会从它原来的位置继续生长。
-       ------------------------------------------------------------ */
-
-    card.classList.add(
-        "morph-hidden"
-    );
-
-
-    /* ------------------------------------------------------------
-       0ms：文章内容先隐藏
-       ------------------------------------------------------------ */
+    document.body.classList.add("article-mode", "ios26-liquid-morphing", "ios26-liquid-opening");
+    document.body.classList.remove("ios26-liquid-opened");
+    overlay.classList.add("active");
+    document.body.style.overflow = "hidden";
 
     hideArticleContent();
+    card.classList.add("ios26-morph-source");
+    pressCard(card);
 
+    articlePage.style.transition = "none";
+    articlePage.style.left = `${source.left}px`;
+    articlePage.style.top = `${source.top}px`;
+    articlePage.style.width = `${source.width}px`;
+    articlePage.style.height = `${source.height}px`;
+    articlePage.style.borderRadius = `${CARD_RADIUS}px`;
+    articlePage.style.opacity = "1";
+    articlePage.style.overflowY = "hidden";
+    articlePage.style.pointerEvents = "none";
 
-    /* ------------------------------------------------------------
-       设置 Morph 初始状态
-       ------------------------------------------------------------ */
-
-    articlePage.style.transition =
-        "none";
-
-    articlePage.style.visibility =
-        "visible";
-
-    articlePage.style.opacity =
-        "1";
-
-    articlePage.style.overflowY =
-        "hidden";
-
-    articlePage.style.borderRadius =
-        `${CARD_RADIUS}px`;
-
-    setArticleGeometry(
-        sourceRect
-    );
-
-    /* 强制浏览器提交初始几何状态 */
     articlePage.getBoundingClientRect();
-
-
-    /* ------------------------------------------------------------
-       55ms：背景开始暗化
-       ------------------------------------------------------------ */
-
     animateBackgroundOpen();
 
-
-    /* ============================================================
-       0 - 300ms：核心同源液态形变
-
-       0ms：
-         卡片原始位置/大小/圆角
-
-       0 - 200ms：
-         容器高速向外流体扩张
-
-       55ms：
-         背景才开始缓慢暗化
-
-       175ms：
-         App 内容开始淡入
-
-       288ms 左右：
-         极轻微弹簧过冲
-
-       300ms：
-         稳定为完整 App 页面
-       ============================================================ */
-
-    const finalWidth =
-        window.innerWidth;
-
-    const finalHeight =
-        window.innerHeight;
-
-    articleAnimation =
-        articlePage.animate(
-            [
-                {
-                    left:
-                        `${sourceRect.left}px`,
-                    top:
-                        `${sourceRect.top}px`,
-                    width:
-                        `${sourceRect.width}px`,
-                    height:
-                        `${sourceRect.height}px`,
-                    borderRadius:
-                        `${CARD_RADIUS}px`
-                },
-
-                {
-                    left:
-                        `${sourceRect.left * 0.55}px`,
-                    top:
-                        `${sourceRect.top * 0.55}px`,
-                    width:
-                        `${sourceRect.width +
-                            (finalWidth - sourceRect.width) * 0.78}px`,
-                    height:
-                        `${sourceRect.height +
-                            (finalHeight - sourceRect.height) * 0.78}px`,
-                    borderRadius:
-                        `${CARD_RADIUS * 0.42}px`
-                },
-
-                {
-                    left:
-                        `${sourceRect.left * 0.12}px`,
-                    top:
-                        `${sourceRect.top * 0.12}px`,
-                    width:
-                        `${finalWidth * SPRING_OVERSHOOT}px`,
-                    height:
-                        `${finalHeight * SPRING_OVERSHOOT}px`,
-                    borderRadius:
-                        "1px"
-                },
-
-                {
-                    left: "0px",
-                    top: "0px",
-                    width: `${finalWidth}px`,
-                    height: `${finalHeight}px`,
-                    borderRadius:
-                        `${FINAL_RADIUS}px`
-                }
-            ],
-            {
-                duration: OPEN_DURATION,
-                easing: LIQUID_SPRING_EASE,
-                fill: "forwards"
-            }
-        );
-
+    const glass = createGlass(source);
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const cx = source.left + source.width / 2;
+    const cy = source.top + source.height / 2;
 
     /* ------------------------------------------------------------
-       175ms：App 内容淡入
+       0-200ms：Glass 容器从“被点击卡片”向四周摊开。
+       这里故意不用 scale 整个 App，而是改变真实几何边界。
        ------------------------------------------------------------ */
+    glassAnimation = glass.animate([
+        {
+            left: `${source.left}px`,
+            top: `${source.top}px`,
+            width: `${source.width}px`,
+            height: `${source.height}px`,
+            borderRadius: `${CARD_RADIUS}px`,
+            opacity: 1,
+            filter: "blur(0px) saturate(1)",
+            boxShadow: "0 8px 28px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.30)"
+        },
+        {
+            left: `${cx - source.width * .68}px`,
+            top: `${cy - source.height * .76}px`,
+            width: `${source.width * 2.36}px`,
+            height: `${source.height * 2.52}px`,
+            borderRadius: "44px",
+            opacity: 1,
+            filter: "blur(1px) saturate(1.20)",
+            boxShadow: "0 18px 54px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.34)"
+        },
+        {
+            left: `${-W * .012}px`,
+            top: `${-H * .012}px`,
+            width: `${W * 1.024}px`,
+            height: `${H * 1.024}px`,
+            borderRadius: "7px",
+            opacity: 1,
+            filter: "blur(1.5px) saturate(1.12)",
+            boxShadow: "0 20px 62px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.20)"
+        },
+        {
+            left: "0px",
+            top: "0px",
+            width: `${W}px`,
+            height: `${H}px`,
+            borderRadius: `${FULL_RADIUS}px`,
+            opacity: 0,
+            filter: "blur(0px) saturate(1)",
+            boxShadow: "0 0 0 rgba(0,0,0,0)"
+        }
+    ], {
+        duration: OPEN_DURATION,
+        easing: LIQUID_SPRING,
+        fill: "forwards"
+    });
 
-    scheduleArticleContent();
+    /* ------------------------------------------------------------
+       Glass 高光层：0-300ms 横向扫过，制造“液体表面”运动。
+       ------------------------------------------------------------ */
+    glass.animate([
+        { transform: "translate3d(-78%,0,0) rotate(-4deg)", opacity: .72 },
+        { transform: "translate3d(-5%,2%,0) rotate(-1deg)", opacity: .58 },
+        { transform: "translate3d(72%,6%,0) rotate(2deg)", opacity: .20 },
+        { transform: "translate3d(105%,8%,0) rotate(3deg)", opacity: 0 }
+    ], {
+        duration: OPEN_DURATION,
+        easing: "cubic-bezier(.22,1,.36,1)",
+        fill: "forwards"
+    });
 
+    /* 145ms：源卡片 UI 淡出，但 Glass 仍然覆盖在同一个几何层上。 */
+    setTimeout(() => {
+        if (articleMorphDirection !== "open") return;
+        card.classList.remove("ios26-morph-source");
+        card.classList.add("ios26-morph-source-hidden");
+    }, SOURCE_FADE_TIME);
 
-    articleAnimation.onfinish =
-        () => {
+    /* 165ms：App 内容开始进入，和源 UI 形成交叉。 */
+    showArticleContent();
 
-            if (
-                articleMorphDirection !==
-                "open"
-            ) {
-                return;
-            }
+    glassAnimation.onfinish = () => {
+        if (articleMorphDirection !== "open") return;
 
-            setArticleFullscreen();
-
-            articlePage.style.borderRadius =
-                `${FINAL_RADIUS}px`;
-
-            articlePage.style.overflowY =
-                "auto";
-
-            articleAnimation = null;
-        };
+        glass.remove();
+        articlePage.style.left = "0px";
+        articlePage.style.top = "0px";
+        articlePage.style.width = "100vw";
+        articlePage.style.height = "100vh";
+        articlePage.style.borderRadius = `${FULL_RADIUS}px`;
+        articlePage.style.overflowY = "auto";
+        articlePage.style.pointerEvents = "auto";
+        glassAnimation = null;
+    };
 }
 
-
-/* ================================================================
-   返回文章
-   ================================================================ */
-
 function closeArticle() {
+    if (!activeCard || !articlePage) return;
 
-    if (
-        !activeCard ||
-        !articlePage
-    ) {
-        return;
-    }
+    ensureLiquidGlassLayer();
 
-    const currentRect =
-        articlePage.getBoundingClientRect();
+    const card = activeCard;
+    const target = getCardRect(card);
+    articleMorphDirection = "close";
 
-    const targetRect =
-        getCardRect(activeCard);
-
-    articleMorphDirection =
-        "close";
-
-    cancelAllArticleAnimations();
-
+    cancelAllAnimations();
     hideArticleContent();
+    document.body.classList.remove("ios26-liquid-opened");
+    document.body.classList.add("ios26-liquid-opening", "ios26-liquid-morphing");
+    articlePage.style.pointerEvents = "none";
 
     animateBackgroundClose();
 
+    const glass = createGlass({
+        left: 0,
+        top: 0,
+        width: window.innerWidth,
+        height: window.innerHeight
+    });
+    glass.style.borderRadius = "0px";
+    glass.style.opacity = "0";
 
     /* ------------------------------------------------------------
-       读取当前视觉状态。
-
-       如果用户在打开动画中途点击返回，
-       就从当前状态直接反向收缩。
+       反向：全屏 Glass → 扩散 → 精准回到源卡片。
+       圆角同步 0 → 44 → 26px。
        ------------------------------------------------------------ */
+    glassAnimation = glass.animate([
+        {
+            left: "0px",
+            top: "0px",
+            width: "100vw",
+            height: "100vh",
+            borderRadius: "0px",
+            opacity: 0
+        },
+        {
+            left: "0px",
+            top: "0px",
+            width: "100vw",
+            height: "100vh",
+            borderRadius: "7px",
+            opacity: .94
+        },
+        {
+            left: `${target.left - target.width * .58}px`,
+            top: `${target.top - target.height * .76}px`,
+            width: `${target.width * 2.22}px`,
+            height: `${target.height * 2.46}px`,
+            borderRadius: "44px",
+            opacity: 1
+        },
+        {
+            left: `${target.left}px`,
+            top: `${target.top}px`,
+            width: `${target.width}px`,
+            height: `${target.height}px`,
+            borderRadius: `${CARD_RADIUS}px`,
+            opacity: 1
+        }
+    ], {
+        duration: CLOSE_DURATION,
+        easing: LIQUID_CLOSE,
+        fill: "forwards"
+    });
 
-    articlePage.style.visibility =
-        "visible";
+    glass.animate([
+        { transform: "translate3d(78%,8%,0) rotate(3deg)", opacity: 0 },
+        { transform: "translate3d(15%,4%,0) rotate(1deg)", opacity: .40 },
+        { transform: "translate3d(-42%,-2%,0) rotate(-2deg)", opacity: .62 },
+        { transform: "translate3d(-78%,-5%,0) rotate(-4deg)", opacity: .76 }
+    ], {
+        duration: CLOSE_DURATION,
+        easing: "cubic-bezier(.22,1,.36,1)",
+        fill: "forwards"
+    });
 
-    articlePage.style.opacity =
-        "1";
+    /* 145ms：源卡片先恢复，Glass 最后落位，避免视觉断层。 */
+    setTimeout(() => {
+        if (articleMorphDirection !== "close") return;
+        card.classList.remove("ios26-morph-source-hidden");
+        card.classList.add("ios26-morph-source");
+    }, SOURCE_FADE_TIME);
 
-    articlePage.style.overflowY =
-        "hidden";
-
-    articlePage.style.left =
-        `${currentRect.left}px`;
-
-    articlePage.style.top =
-        `${currentRect.top}px`;
-
-    articlePage.style.width =
-        `${currentRect.width}px`;
-
-    articlePage.style.height =
-        `${currentRect.height}px`;
-
-    const currentRadius =
-        Math.min(
-            CARD_RADIUS,
-            Math.max(
-                0,
-                currentRect.width * 0.08
-            )
-        );
-
-    articlePage.style.borderRadius =
-        `${currentRadius}px`;
-
-    articlePage.getBoundingClientRect();
-
-
-    /* ============================================================
-       反向镜像：
-
-       全屏 App
-         ↓
-       内容淡出
-         ↓
-       容器收缩
-         ↓
-       圆角恢复
-         ↓
-       精准落回原卡片
-       ============================================================ */
-
-    articleAnimation =
-        articlePage.animate(
-            [
-                {
-                    left:
-                        `${currentRect.left}px`,
-                    top:
-                        `${currentRect.top}px`,
-                    width:
-                        `${currentRect.width}px`,
-                    height:
-                        `${currentRect.height}px`,
-                    borderRadius:
-                        `${currentRadius}px`
-                },
-
-                {
-                    left:
-                        `${targetRect.left}px`,
-                    top:
-                        `${targetRect.top}px`,
-                    width:
-                        `${targetRect.width * 1.015}px`,
-                    height:
-                        `${targetRect.height * 1.015}px`,
-                    borderRadius:
-                        `${CARD_RADIUS + 1}px`
-                },
-
-                {
-                    left:
-                        `${targetRect.left}px`,
-                    top:
-                        `${targetRect.top}px`,
-                    width:
-                        `${targetRect.width}px`,
-                    height:
-                        `${targetRect.height}px`,
-                    borderRadius:
-                        `${CARD_RADIUS}px`
-                }
-            ],
-            {
-                duration: CLOSE_DURATION,
-                easing: LIQUID_CLOSE_EASE,
-                fill: "forwards"
-            }
-        );
-
-    articleAnimation.onfinish =
-        () => {
-
-            finishCloseArticle();
-
-        };
+    glassAnimation.onfinish = () => {
+        finishCloseArticle();
+        glass.remove();
+    };
 }
 
-
-/* ================================================================
-   返回动画完成后的清理
-   ================================================================ */
-
 function finishCloseArticle() {
+    if (articleAnimation) articleAnimation.cancel();
+    if (glassAnimation) glassAnimation.cancel();
+    if (backgroundAnimation) backgroundAnimation.cancel();
 
-    if (articleAnimation) {
-        articleAnimation.cancel();
-        articleAnimation = null;
-    }
+    articleAnimation = null;
+    glassAnimation = null;
+    backgroundAnimation = null;
 
-    if (backgroundAnimation) {
-        backgroundAnimation.cancel();
-        backgroundAnimation = null;
-    }
-
-    overlay.classList.remove(
-        "active"
-    );
-
+    overlay.classList.remove("active");
     document.body.classList.remove(
-        "article-mode"
+        "article-mode",
+        "ios26-liquid-morphing",
+        "ios26-liquid-opening",
+        "ios26-liquid-opened"
     );
 
     if (activeCard) {
-
         activeCard.classList.remove(
-            "morph-hidden"
+            "morph-hidden",
+            "ios26-morph-source",
+            "ios26-morph-source-hidden"
         );
-
         activeCard.style.transform = "";
+        activeCard.style.filter = "";
         activeCard.style.opacity = "";
     }
 
-    resetArticleGeometry();
+    articlePage.style.left = "";
+    articlePage.style.top = "";
+    articlePage.style.width = "";
+    articlePage.style.height = "";
+    articlePage.style.borderRadius = "";
+    articlePage.style.opacity = "";
+    articlePage.style.overflowY = "";
+    articlePage.style.pointerEvents = "";
 
     document.body.style.overflow = "";
 
@@ -1594,27 +1302,13 @@ function finishCloseArticle() {
     currentPostId = "";
     articleMorphDirection = null;
 
-    history.replaceState(
-        null,
-        "",
-        window.location.pathname
-    );
+    history.replaceState(null, "", window.location.pathname);
 }
 
-
-/* ================================================================
-   返回按钮
-   ================================================================ */
-
-backBtn.addEventListener(
-    "click",
-    (e) => {
-
-        e.preventDefault();
-
-        closeArticle();
-    }
-);
+backBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeArticle();
+});
 
 
 /* ================================================================

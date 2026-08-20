@@ -79,6 +79,6 @@ print(fibonacci(10))
 
 ## GitHub 仓库卡片
 
-::github{repo="twikoojs/twikoo"}
+::github{repo="hwxlikemi/bxdcblog"}
 
-::github{repo="withastro/astro"}
+
