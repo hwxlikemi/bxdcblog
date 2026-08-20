@@ -990,11 +990,11 @@ function openArticle(
         }
     );
 
-    // 155ms 后内容淡入
+    // 200ms 后内容渐显
     contentFadeTimer = setTimeout(() => {
         if (!activeCard) return;
         showArticleContent();
-    }, 155);
+    }, 200);
 
     articleAnimation.onfinish = () => {
         if (!activeCard) return;
@@ -1623,11 +1623,42 @@ function buildCommentTree(comments: TwikooComment[]): TwikooComment[][] {
 async function loadTwikooComments() {
     if (!commentListScroll) return;
 
-    try {
-        const result = await fetchComments({
-            url: currentPostId || window.location.pathname,
-        });
+    // 显示加载状态
+    commentListScroll.innerHTML = `
+        <div style="text-align:center;padding:40px 0;color:var(--text-secondary);font-size:0.9rem;">
+            评论加载中...
+        </div>
+    `;
 
+    const postUrl = currentPostId || window.location.pathname;
+    let result = null;
+    let lastError = null;
+
+    // 最多重试 2 次（共 3 次尝试）
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            result = await fetchComments({ url: postUrl });
+            break;
+        } catch (e) {
+            lastError = e;
+            console.warn(`Twikoo 评论加载第 ${attempt + 1} 次失败`, e);
+            if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 800));
+            }
+        }
+    }
+
+    if (!result) {
+        console.error("Twikoo 评论加载最终失败", lastError);
+        commentListScroll.innerHTML = `
+            <div style="text-align:center;padding:40px 0;color:var(--text-secondary);font-size:0.9rem;">
+                评论加载失败，请刷新重试
+            </div>
+        `;
+        return;
+    }
+
+    try {
         const comments: TwikooComment[] = result.data || [];
 
         // 更新评论数
@@ -1667,10 +1698,10 @@ async function loadTwikooComments() {
         }
 
     } catch (e) {
-        console.error("Twikoo 加载失败", e);
+        console.error("Twikoo 评论渲染失败", e);
         commentListScroll.innerHTML = `
             <div style="text-align:center;padding:40px 0;color:var(--text-secondary);font-size:0.9rem;">
-                评论加载失败，请刷新重试
+                评论渲染失败，请刷新重试
             </div>
         `;
     }

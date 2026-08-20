@@ -840,15 +840,15 @@
         }
 
         /*
-         * 文章打开以后，悬浮音乐按钮上移到互动栏上方，保持右下角区域。
+         * 文章打开以后，悬浮音乐按钮保持右下角，与评论/分享垂直排列。
          */
         body.article-mode .floating-controls {
-            bottom: 100px;
+            bottom: 24px;
         }
 
         .float-btn {
-            width: 50px;
-            height: 50px;
+            width: 52px;
+            height: 52px;
 
             border-radius: 50%;
 
@@ -1097,7 +1097,7 @@
                     rgba(255,255,255,0.17),
                     rgba(255,255,255,0.055)
                 ),
-                rgba(255,255,255,0.55);
+                rgba(255,255,255,0.28);
 
             backdrop-filter:
                 blur(22px)
@@ -1173,8 +1173,8 @@
         ========================================================= */
 
         .glass-circle-btn {
-            width: 54px;
-            height: 54px;
+            width: 52px;
+            height: 52px;
 
             border-radius: 50%;
 
@@ -1261,7 +1261,7 @@
         .article-action-bar {
         position: fixed;
         right: 24px;
-        bottom: 88px;
+        bottom: 156px;
 
         display: flex;
         flex-direction: column;
@@ -2260,10 +2260,19 @@
             transform: translate3d(0,0,0) scale(1);
         }
 
+        .article-action-bar {
+            bottom: 148px;
+        }
+
         .article-action-bar .glass-circle-btn {
             width: 48px;
             height: 48px;
             font-size: 1.08rem;
+        }
+
+        body.article-mode .floating-controls .float-btn {
+            width: 48px;
+            height: 48px;
         }
 
         /* 返回时让卡片与文章缩回严格同步，避免 270ms 的提前跳出。 */
@@ -2292,7 +2301,7 @@
                 right: 16px;
                 left: auto;
                 top: auto;
-                bottom: 80px;
+                bottom: 136px;
                 justify-content: center;
                 flex-direction: column;
                 gap: 12px;
@@ -2304,6 +2313,11 @@
             }
 
             .article-action-bar .glass-circle-btn {
+                width: 46px;
+                height: 46px;
+            }
+
+            body.article-mode .floating-controls .float-btn {
                 width: 46px;
                 height: 46px;
             }
@@ -2712,7 +2726,7 @@
         .playlist-overlay {
             position: fixed;
             inset: 0;
-            z-index: 10004;
+            z-index: 25000;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -2870,13 +2884,10 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-        /* 文章模式下音乐按钮移到分享下方，隐藏返回顶部，音乐按钮弹入 */
+        /* 文章模式下音乐按钮移到分享下方，音乐按钮弹入 */
         body.article-mode .floating-controls {
             bottom: 24px !important;
             right: 24px !important;
-        }
-        body.article-mode .floating-controls #scrollTopBtn {
-            display: none;
         }
         body.article-mode .floating-controls #musicToggleBtn {
             animation: buttonPopIn 380ms cubic-bezier(0.34, 1.56, 0.64, 1) 0ms both;
@@ -2958,18 +2969,18 @@ body.article-mode #mainWrapper {
 
 #articleContent.content-hidden {
     opacity: 0;
-    transform: translate3d(0, 8px, 0) scale(0.985);
+    transform: translate3d(0, 12px, 0) scale(0.98);
     transition:
-        opacity 90ms ease,
-        transform 120ms ease;
+        opacity 100ms ease,
+        transform 140ms ease;
 }
 
 #articleContent.content-visible {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
     transition:
-        opacity 125ms cubic-bezier(0.22, 1, 0.36, 1),
-        transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        opacity 360ms cubic-bezier(0.22, 1, 0.36, 1) 60ms,
+        transform 440ms cubic-bezier(0.22, 1, 0.36, 1) 60ms;
 }
 
 /* 原卡片只隐藏视觉，不改变 DOM，保证返回时能精准读取原始位置。 */
@@ -3008,6 +3019,7 @@ body.article-mode #mainWrapper {
 
 body.ios26-morph-running #mainWrapper {
     filter: brightness(1) saturate(1) !important;
+    contain: layout paint;
 }
 
 .article-page.ios26-glass-morph {
