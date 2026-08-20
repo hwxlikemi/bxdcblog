@@ -779,8 +779,11 @@ let currentPostId = "";
 
 /** 页面变形动画 */
 let articleAnimation = null;
+/** 背景变暗动画 */
+let backgroundAnimation = null;
 /** 内容淡入定时器 */
 let contentFadeTimer = null;
+/** 点击瞬间保存的源卡片几何，返回绝不重新计算 */
 let activeMorphRect = null;
 /** 按压定时器 */
 let pressTimer = null;
@@ -810,9 +813,9 @@ const mainWrapper =
         "mainWrapper"
     );
 
-/* 动画参数：入场 480ms easeOutCubic，退场 420ms easeInOutCubic */
-const OPEN_DURATION = 300;
-const CLOSE_DURATION = 300;
+/* 动画参数 */
+const OPEN_DURATION = 480;
+const CLOSE_DURATION = 420;
 const EASE_OUT_CUBIC = "cubic-bezier(0.33, 1, 0.68, 1)";
 const EASE_IN_OUT_CUBIC = "cubic-bezier(0.65, 0, 0.35, 1)";
 const CONTENT_FADE_DELAY = 280;
@@ -822,6 +825,10 @@ function cancelAllAnimations() {
     if (articleAnimation) {
         articleAnimation.cancel();
         articleAnimation = null;
+    }
+    if (backgroundAnimation) {
+        backgroundAnimation.cancel();
+        backgroundAnimation = null;
     }
     if (contentFadeTimer) {
         clearTimeout(contentFadeTimer);
@@ -860,23 +867,6 @@ function openArticle(
     date,
     category
 ) {
-    /*
-     * iOS26 Glass Morph：
-     * 关键原则是“同一帧接管”。
-     *
-     * 旧实现的问题：
-     * 1. overlay 先显示，articlePage 80ms 后才开始动画 -> 会闪旧世界；
-     * 2. articlePage 使用 scale -> 内容也被缩放；
-     * 3. 返回重新 getBoundingClientRect -> 不是原路。
-     *
-     * 现在：
-     * 1. 先记录源卡片；
-     * 2. articlePage 先放到源卡片位置，但保持最终 DOM；
-     * 3. 强制布局后，同一帧隐藏源卡片 + 显示 articlePage；
-     * 4. 使用 left/top/width/height/radius 做真正几何 Morph；
-     * 5. 返回永远使用点击瞬间保存的 sourceRect。
-     */
-
     cancelAllAnimations();
 
     activeCard = card;
@@ -884,7 +874,7 @@ function openArticle(
 
     const rect = card.getBoundingClientRect();
 
-    // 永久保存“点击瞬间”的源几何，返回绝不重新计算。
+    // 永久保存"点击瞬间"的源几何，返回绝不重新计算
     activeMorphRect = {
         left: rect.left,
         top: rect.top,
@@ -909,14 +899,10 @@ function openArticle(
     const rawHtml = template ? template.innerHTML : "";
     const enhancedHtml = enhanceMarkdownHtml(rawHtml);
     const viewBody = document.getElementById("viewBody");
-
     viewBody.innerHTML = enhancedHtml;
     enhanceMarkdownDom(viewBody);
 
-    /*
-     * 先准备文章页。
-     * 此时它还没有显示到用户眼前。
-     */
+    // 先准备文章页到源卡片位置，此时还未显示
     articlePage.style.transition = "none";
     articlePage.style.left = `${rect.left}px`;
     articlePage.style.top = `${rect.top}px`;
@@ -931,26 +917,15 @@ function openArticle(
 
     hideArticleContent();
 
-    /*
-     * 强制浏览器把“源位置”作为真实起始帧。
-     * 然后在同一渲染批次内：
-     * card 隐藏 + article overlay 显示。
-     * 不再存在 80ms 的旧世界空窗。
-     */
+    // 强制布局，同一帧隐藏源卡片 + 显示文章页
     articlePage.getBoundingClientRect();
     card.classList.add("morph-hidden");
 
-    document.body.classList.add(
-        "article-mode",
-        "ios26-morph-running"
-    );
+    document.body.classList.add("article-mode", "ios26-morph-running");
     overlay.classList.add("active");
     document.body.style.overflow = "hidden";
 
-    /*
-     * 背景不能在 0ms 突然变暗。
-     * 用独立动画延迟 55ms。
-     */
+    // 背景渐暗（延迟 55ms，避免突然变暗）
     if (mainWrapper) {
         mainWrapper.style.transition = "none";
         mainWrapper.style.filter = "brightness(1) saturate(1)";
@@ -969,16 +944,7 @@ function openArticle(
         );
     }
 
-    /*
-     * 核心 Morph：
-     *
-     * 0ms      源卡片尺寸
-     * 90ms     快速向外液态摊开
-     * 205ms    接近全屏
-     * 300ms    全屏
-     *
-     * 没有 scale，所以文章文字/图片不会跟着整体缩放。
-     */
+    // 核心 Morph：left/top/width/height 几何变换，无 scale
     const W = window.innerWidth;
     const H = window.innerHeight;
 
@@ -990,8 +956,7 @@ function openArticle(
                 width: `${rect.width}px`,
                 height: `${rect.height}px`,
                 borderRadius: "26px",
-                boxShadow:
-                    "0 8px 30px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.30)"
+                boxShadow: "0 8px 30px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.30)"
             },
             {
                 left: `${rect.left - rect.width * .28}px`,
@@ -999,8 +964,7 @@ function openArticle(
                 width: `${rect.width * 1.56}px`,
                 height: `${rect.height * 1.72}px`,
                 borderRadius: "42px",
-                boxShadow:
-                    "0 18px 48px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.34)"
+                boxShadow: "0 18px 48px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.34)"
             },
             {
                 left: `${-W * .008}px`,
@@ -1008,8 +972,7 @@ function openArticle(
                 width: `${W * 1.016}px`,
                 height: `${H * 1.016}px`,
                 borderRadius: "7px",
-                boxShadow:
-                    "0 22px 60px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.22)"
+                boxShadow: "0 22px 60px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.22)"
             },
             {
                 left: "0px",
@@ -1017,59 +980,27 @@ function openArticle(
                 width: `${W}px`,
                 height: `${H}px`,
                 borderRadius: "0px",
-                boxShadow:
-                    "0 0 0 rgba(0,0,0,0), inset 0 1px 0 rgba(255,255,255,.10)"
+                boxShadow: "0 0 0 rgba(0,0,0,0), inset 0 1px 0 rgba(255,255,255,.10)"
             }
         ],
         {
             duration: OPEN_DURATION,
-            easing:
-                "linear(0, .10 7%, .25 18%, .48 35%, .70 53%, .85 69%, .94 82%, .992 91%, 1.006 96%, .999 99%, 1 100%)",
+            easing: "linear(0, .10 7%, .25 18%, .48 35%, .70 53%, .85 69%, .94 82%, .992 91%, 1.006 96%, .999 99%, 1 100%)",
             fill: "forwards"
         }
     );
 
-    /*
-     * 145ms：
-     * 原卡片已经完全隐藏；
-     * 文章内容开始进入，但 Morph 容器仍然是最高优先级。
-     */
+    // 155ms 后内容淡入
     contentFadeTimer = setTimeout(() => {
         if (!activeCard) return;
         showArticleContent();
     }, 155);
 
-    /*
-     * Glass 高光层。
-     * 不创建第二个会遮挡 articlePage 的 DOM，
-     * 而是使用 articlePage 自身的 ::before / ::after。
-     */
-    const glassHighlight = articlePage.animate(
-        [
-            {
-                filter: "blur(0px) saturate(1)",
-                opacity: 1
-            },
-            {
-                filter: "blur(.7px) saturate(1.16)",
-                opacity: 1,
-                offset: .48
-            },
-            {
-                filter: "blur(0px) saturate(1.08)",
-                opacity: 1
-            }
-        ],
-        {
-            duration: OPEN_DURATION,
-            easing: "cubic-bezier(.22,1,.36,1)",
-            fill: "forwards"
-        }
-    );
-
     articleAnimation.onfinish = () => {
         if (!activeCard) return;
-
+        // 关键修复：移除 ios26-glass-morph 类，恢复 overflow 和交互
+        articlePage.classList.remove("ios26-glass-morph");
+        articlePage.classList.add("ios26-glass-settled");
         articlePage.style.left = "0px";
         articlePage.style.top = "0px";
         articlePage.style.width = "100vw";
@@ -1077,8 +1008,6 @@ function openArticle(
         articlePage.style.borderRadius = "0px";
         articlePage.style.overflowY = "auto";
         articlePage.style.pointerEvents = "auto";
-
-        articlePage.classList.add("ios26-glass-settled");
         articleAnimation = null;
     };
 }
@@ -1087,39 +1016,28 @@ function openArticle(
 function closeArticle() {
     if (!activeCard) return;
 
-    /*
-     * 如果打开动画尚未结束：
-     * 直接反向同一条 Web Animation。
-     * 这是真正的“原路返回”，而不是重新生成一条路径。
-     */
+    // 打开动画尚未结束：直接反向同一条 Web Animation，原路返回
     if (articleAnimation && articleAnimation.playState === "running") {
         hideArticleContent();
-
         articleAnimation.reverse();
-
         articleAnimation.onfinish = () => {
             finishCloseArticle();
         };
-
         if (backgroundAnimation) {
             backgroundAnimation.reverse();
         }
-
         return;
     }
 
     hideArticleContent();
 
     const rect = activeMorphRect;
-
     if (!rect) {
         finishCloseArticle();
         return;
     }
 
-    /*
-     * 正常返回也使用点击瞬间保存的 sourceRect。
-     */
+    // 正常返回也使用点击瞬间保存的 sourceRect
     articleAnimation = articlePage.animate(
         [
             {
@@ -1153,15 +1071,13 @@ function closeArticle() {
         ],
         {
             duration: CLOSE_DURATION,
-            easing:
-                "linear(0, .015 6%, .09 17%, .25 34%, .48 53%, .68 70%, .84 84%, .95 94%, 1 100%)",
+            easing: "linear(0, .015 6%, .09 17%, .25 34%, .48 53%, .68 70%, .84 84%, .95 94%, 1 100%)",
             fill: "forwards"
         }
     );
 
     if (mainWrapper) {
         if (backgroundAnimation) backgroundAnimation.cancel();
-
         backgroundAnimation = mainWrapper.animate(
             [
                 { filter: "brightness(.55) saturate(.90)" },
@@ -1187,23 +1103,17 @@ function closeArticle() {
     };
 }
 
-
 /** 关闭动画结束后的清理 */
 function finishCloseArticle() {
     if (articleAnimation) {
         articleAnimation.cancel();
     }
-
     if (backgroundAnimation) {
         backgroundAnimation.cancel();
     }
 
     overlay.classList.remove("active");
-
-    document.body.classList.remove(
-        "article-mode",
-        "ios26-morph-running"
-    );
+    document.body.classList.remove("article-mode", "ios26-morph-running");
 
     if (activeCard) {
         activeCard.classList.remove("morph-hidden");
@@ -1211,20 +1121,18 @@ function finishCloseArticle() {
         activeCard.style.opacity = "";
     }
 
+    // 清理所有 inline style，恢复 CSS 默认值
     articlePage.style.transition = "none";
-    articlePage.style.left = "0px";
-    articlePage.style.top = "0px";
-    articlePage.style.width = "100vw";
-    articlePage.style.height = "100vh";
-    articlePage.style.borderRadius = "0px";
+    articlePage.style.left = "";
+    articlePage.style.top = "";
+    articlePage.style.width = "";
+    articlePage.style.height = "";
+    articlePage.style.borderRadius = "";
     articlePage.style.opacity = "";
     articlePage.style.visibility = "";
-    articlePage.style.overflowY = "auto";
+    articlePage.style.overflowY = "";
     articlePage.style.pointerEvents = "";
-    articlePage.classList.remove(
-        "ios26-glass-morph",
-        "ios26-glass-settled"
-    );
+    articlePage.classList.remove("ios26-glass-morph", "ios26-glass-settled");
 
     if (mainWrapper) {
         mainWrapper.style.filter = "";
