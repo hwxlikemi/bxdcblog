@@ -13,9 +13,9 @@ export const playlist: Track[] = [
     "cover": "assets/music/cover/aqxx.jpg"
   },
   {
-    "title": "示例歌曲二",
-    "artist": "未知歌手",
-    "url": "assets/music/song2.mp3",
-    "cover": "1000067252_2.jpg"
+    "title": "晨间新闻",
+    "artist": "蔡健雅",
+    "url": "assets/music/晨间新闻.mp3",
+    "cover": "assets/music/cover/cjxw.jpg"
   }
 ];
