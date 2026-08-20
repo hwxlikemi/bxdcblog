@@ -769,37 +769,55 @@ document
 
 
 /* ================================================================
-   6. 文章卡片 Morph 动画 —— 稳定版 iOS26 Glass Morph
-
-   关键原则：
-   1. articlePage 的原始打开生命周期完全保留，避免页面打不开。
-   2. Glass 层只是视觉增强层，不负责承载文章内容。
-   3. 点击瞬间保存 sourceRect，返回永远使用同一组几何数据。
-   4. 打开/返回使用同一条 FLIP 路径，关闭时 reverse() 可打断。
-   ================================================================ */
+   6. 文章卡片 Morph 动画（iOS26 风格，支持打断）
+================================================================ */
 
 let activeCard = null;
+
+/** 当前打开的文章 ID，用于区分不同文章的评论 */
 let currentPostId = "";
+
+/** 页面变形动画 */
 let articleAnimation = null;
+/** 内容淡入定时器 */
 let contentFadeTimer = null;
+let activeMorphRect = null;
+/** 按压定时器 */
 let pressTimer = null;
-let sourceMorphRect = null;
-let morphGlass = null;
 
-const overlay = document.getElementById("articleOverlay");
-const articlePage = document.getElementById("articlePage");
-const articleContent = document.getElementById("articleContent");
-const backBtn = document.getElementById("backBtn");
-const mainWrapper = document.getElementById("mainWrapper");
+const overlay =
+    document.getElementById(
+        "articleOverlay"
+    );
 
-/* 关键参数：总时长 300ms；背景延迟 55ms；内容延迟 165ms。 */
+const articlePage =
+    document.getElementById(
+        "articlePage"
+    );
+
+const articleContent =
+    document.getElementById(
+        "articleContent"
+    );
+
+const backBtn =
+    document.getElementById(
+        "backBtn"
+    );
+
+const mainWrapper =
+    document.getElementById(
+        "mainWrapper"
+    );
+
+/* 动画参数：入场 480ms easeOutCubic，退场 420ms easeInOutCubic */
 const OPEN_DURATION = 300;
 const CLOSE_DURATION = 300;
-const EASE_OUT_CUBIC = "cubic-bezier(0.22, 1, 0.36, 1)";
-const EASE_IN_OUT_CUBIC = "cubic-bezier(0.45, 0, 0.55, 1)";
-const CONTENT_FADE_DELAY = 165;
-const BACKGROUND_DELAY = 55;
+const EASE_OUT_CUBIC = "cubic-bezier(0.33, 1, 0.68, 1)";
+const EASE_IN_OUT_CUBIC = "cubic-bezier(0.65, 0, 0.35, 1)";
+const CONTENT_FADE_DELAY = 280;
 
+/** 取消所有正在运行的动画 */
 function cancelAllAnimations() {
     if (articleAnimation) {
         articleAnimation.cancel();
@@ -815,6 +833,7 @@ function cancelAllAnimations() {
     }
 }
 
+/** 显示文章内容（淡入） */
 function showArticleContent() {
     if (contentFadeTimer) clearTimeout(contentFadeTimer);
     contentFadeTimer = setTimeout(() => {
@@ -824,6 +843,7 @@ function showArticleContent() {
     }, CONTENT_FADE_DELAY);
 }
 
+/** 隐藏文章内容 */
 function hideArticleContent() {
     if (contentFadeTimer) {
         clearTimeout(contentFadeTimer);
@@ -833,85 +853,48 @@ function hideArticleContent() {
     articleContent.classList.add("content-hidden");
 }
 
-function makeMorphGlass(rect) {
-    if (morphGlass) morphGlass.remove();
+function openArticle(
+    card,
+    postId,
+    title,
+    date,
+    category
+) {
+    /*
+     * iOS26 Glass Morph：
+     * 关键原则是“同一帧接管”。
+     *
+     * 旧实现的问题：
+     * 1. overlay 先显示，articlePage 80ms 后才开始动画 -> 会闪旧世界；
+     * 2. articlePage 使用 scale -> 内容也被缩放；
+     * 3. 返回重新 getBoundingClientRect -> 不是原路。
+     *
+     * 现在：
+     * 1. 先记录源卡片；
+     * 2. articlePage 先放到源卡片位置，但保持最终 DOM；
+     * 3. 强制布局后，同一帧隐藏源卡片 + 显示 articlePage；
+     * 4. 使用 left/top/width/height/radius 做真正几何 Morph；
+     * 5. 返回永远使用点击瞬间保存的 sourceRect。
+     */
 
-    morphGlass = document.createElement("div");
-    morphGlass.className = "ios26-glass-morph-layer";
-
-    Object.assign(morphGlass.style, {
-        left: `${rect.left}px`,
-        top: `${rect.top}px`,
-        width: `${rect.width}px`,
-        height: `${rect.height}px`,
-        borderRadius: "26px",
-        opacity: "0.001"
-    });
-
-    document.body.appendChild(morphGlass);
-    return morphGlass;
-}
-
-function animateBackground(opening) {
-    if (!mainWrapper) return;
-
-    mainWrapper.animate(
-        opening
-            ? [
-                { filter: "brightness(1) saturate(1)" },
-                { filter: "brightness(.98) saturate(.99)", offset: .18 },
-                { filter: "brightness(.58) saturate(.90)" }
-            ]
-            : [
-                { filter: "brightness(.58) saturate(.90)" },
-                { filter: "brightness(.88) saturate(.98)", offset: .75 },
-                { filter: "brightness(1) saturate(1)" }
-            ],
-        {
-            duration: 245,
-            delay: opening ? BACKGROUND_DELAY : 0,
-            easing: EASE_OUT_CUBIC,
-            fill: "forwards"
-        }
-    );
-}
-
-function finishCloseArticle() {
-    overlay.classList.remove("active");
-    document.body.classList.remove("article-mode");
-
-    if (activeCard) {
-        activeCard.classList.remove("morph-hidden");
-        activeCard.style.transform = "";
-        activeCard.style.transition = "";
-    }
-
-    articlePage.style.transition = "none";
-    articlePage.style.transform = "translate3d(0,0,0) scale(1)";
-    articlePage.style.borderRadius = "0px";
-    articlePage.style.opacity = "";
-
-    if (morphGlass) {
-        morphGlass.remove();
-        morphGlass = null;
-    }
-
-    document.body.style.overflow = "";
-    articleAnimation = null;
-    activeCard = null;
-    currentPostId = "";
-    sourceMorphRect = null;
-
-    history.replaceState(null, "", window.location.pathname);
-}
-
-function openArticle(card, postId, title, date, category) {
     cancelAllAnimations();
 
     activeCard = card;
     currentPostId = postId;
 
-    if (postId) history.replaceState(null, "", `#post-${postId}`);
+    const rect = card.getBoundingClientRect();
+
+    // 永久保存“点击瞬间”的源几何，返回绝不重新计算。
+    activeMorphRect = {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+    };
+
+    if (postId) {
+        history.replaceState(null, "", `#post-${postId}`);
+    }
 
     document.getElementById("viewTitle").innerText = title;
     document.getElementById("viewMeta").innerHTML = `
@@ -924,173 +907,349 @@ function openArticle(card, postId, title, date, category) {
 
     const template = card.querySelector("template[data-post-html]");
     const rawHtml = template ? template.innerHTML : "";
-    document.getElementById("viewBody").innerHTML = enhanceMarkdownHtml(rawHtml);
-    enhanceMarkdownDom(document.getElementById("viewBody"));
+    const enhancedHtml = enhanceMarkdownHtml(rawHtml);
+    const viewBody = document.getElementById("viewBody");
 
-    /* 先保存源矩形：返回永远使用这份快照，不重新取卡片位置。 */
-    const rect = card.getBoundingClientRect();
-    sourceMorphRect = {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height
-    };
+    viewBody.innerHTML = enhancedHtml;
+    enhanceMarkdownDom(viewBody);
 
-    /* 轻微按压，但不等待按压结束才打开，避免打不开/竞态。 */
-    card.style.transition = "transform 72ms cubic-bezier(.22,1,.36,1)";
-    card.style.transform = "scale(.975)";
-
-    document.body.classList.add("article-mode");
-    overlay.classList.add("active");
-    document.body.style.overflow = "hidden";
-    card.classList.add("morph-hidden");
-    hideArticleContent();
-
-    /* articlePage 仍然使用原项目 overlay 生命周期，只改变起始 FLIP。 */
+    /*
+     * 先准备文章页。
+     * 此时它还没有显示到用户眼前。
+     */
     articlePage.style.transition = "none";
-    const startTransform =
-        `translate3d(${sourceMorphRect.left}px, ${sourceMorphRect.top}px, 0) ` +
-        `scale(${sourceMorphRect.width / window.innerWidth}, ${sourceMorphRect.height / window.innerHeight})`;
-    articlePage.style.transform = startTransform;
+    articlePage.style.left = `${rect.left}px`;
+    articlePage.style.top = `${rect.top}px`;
+    articlePage.style.width = `${rect.width}px`;
+    articlePage.style.height = `${rect.height}px`;
     articlePage.style.borderRadius = "26px";
     articlePage.style.opacity = "1";
+    articlePage.style.visibility = "visible";
+    articlePage.style.overflowY = "hidden";
+    articlePage.style.pointerEvents = "none";
+    articlePage.classList.add("ios26-glass-morph");
 
-    /* 独立 Glass 层：透明承载，不遮挡真正文章 DOM。 */
-    const glass = makeMorphGlass(sourceMorphRect);
-    glass.style.opacity = "1";
+    hideArticleContent();
 
+    /*
+     * 强制浏览器把“源位置”作为真实起始帧。
+     * 然后在同一渲染批次内：
+     * card 隐藏 + article overlay 显示。
+     * 不再存在 80ms 的旧世界空窗。
+     */
     articlePage.getBoundingClientRect();
-    animateBackground(true);
+    card.classList.add("morph-hidden");
+
+    document.body.classList.add(
+        "article-mode",
+        "ios26-morph-running"
+    );
+    overlay.classList.add("active");
+    document.body.style.overflow = "hidden";
+
+    /*
+     * 背景不能在 0ms 突然变暗。
+     * 用独立动画延迟 55ms。
+     */
+    if (mainWrapper) {
+        mainWrapper.style.transition = "none";
+        mainWrapper.style.filter = "brightness(1) saturate(1)";
+        backgroundAnimation = mainWrapper.animate(
+            [
+                { filter: "brightness(1) saturate(1)" },
+                { filter: "brightness(.88) saturate(.98)", offset: .30 },
+                { filter: "brightness(.55) saturate(.90)" }
+            ],
+            {
+                duration: 245,
+                delay: 55,
+                easing: "cubic-bezier(.22,1,.36,1)",
+                fill: "forwards"
+            }
+        );
+    }
+
+    /*
+     * 核心 Morph：
+     *
+     * 0ms      源卡片尺寸
+     * 90ms     快速向外液态摊开
+     * 205ms    接近全屏
+     * 300ms    全屏
+     *
+     * 没有 scale，所以文章文字/图片不会跟着整体缩放。
+     */
+    const W = window.innerWidth;
+    const H = window.innerHeight;
 
     articleAnimation = articlePage.animate(
         [
             {
-                transform: startTransform,
-                borderRadius: "26px"
+                left: `${rect.left}px`,
+                top: `${rect.top}px`,
+                width: `${rect.width}px`,
+                height: `${rect.height}px`,
+                borderRadius: "26px",
+                boxShadow:
+                    "0 8px 30px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.30)"
             },
             {
-                transform: "translate3d(0,0,0) scale(1,1)",
-                borderRadius: "0px"
+                left: `${rect.left - rect.width * .28}px`,
+                top: `${rect.top - rect.height * .32}px`,
+                width: `${rect.width * 1.56}px`,
+                height: `${rect.height * 1.72}px`,
+                borderRadius: "42px",
+                boxShadow:
+                    "0 18px 48px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.34)"
+            },
+            {
+                left: `${-W * .008}px`,
+                top: `${-H * .008}px`,
+                width: `${W * 1.016}px`,
+                height: `${H * 1.016}px`,
+                borderRadius: "7px",
+                boxShadow:
+                    "0 22px 60px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.22)"
+            },
+            {
+                left: "0px",
+                top: "0px",
+                width: `${W}px`,
+                height: `${H}px`,
+                borderRadius: "0px",
+                boxShadow:
+                    "0 0 0 rgba(0,0,0,0), inset 0 1px 0 rgba(255,255,255,.10)"
             }
         ],
         {
             duration: OPEN_DURATION,
-            easing: EASE_OUT_CUBIC,
+            easing:
+                "linear(0, .10 7%, .25 18%, .48 35%, .70 53%, .85 69%, .94 82%, .992 91%, 1.006 96%, .999 99%, 1 100%)",
             fill: "forwards"
         }
     );
 
-    /* Glass 层只做高光/磨砂变化，与页面完全同源。 */
-    glass.animate(
+    /*
+     * 145ms：
+     * 原卡片已经完全隐藏；
+     * 文章内容开始进入，但 Morph 容器仍然是最高优先级。
+     */
+    contentFadeTimer = setTimeout(() => {
+        if (!activeCard) return;
+        showArticleContent();
+    }, 155);
+
+    /*
+     * Glass 高光层。
+     * 不创建第二个会遮挡 articlePage 的 DOM，
+     * 而是使用 articlePage 自身的 ::before / ::after。
+     */
+    const glassHighlight = articlePage.animate(
         [
             {
-                borderRadius: "26px",
-                opacity: .98,
-                backdropFilter: "blur(8px) saturate(1.05)",
-                transform: "scale(1)"
+                filter: "blur(0px) saturate(1)",
+                opacity: 1
             },
             {
-                borderRadius: "10px",
-                opacity: .55,
-                backdropFilter: "blur(18px) saturate(1.15)",
-                transform: "scale(1.018)"
+                filter: "blur(.7px) saturate(1.16)",
+                opacity: 1,
+                offset: .48
             },
             {
-                borderRadius: "0px",
-                opacity: 0,
-                backdropFilter: "blur(0px) saturate(1)",
-                transform: "scale(1)"
+                filter: "blur(0px) saturate(1.08)",
+                opacity: 1
             }
         ],
         {
             duration: OPEN_DURATION,
-            easing: EASE_OUT_CUBIC,
+            easing: "cubic-bezier(.22,1,.36,1)",
             fill: "forwards"
         }
     );
 
-    showArticleContent();
-
     articleAnimation.onfinish = () => {
-        articlePage.style.transform = "translate3d(0,0,0) scale(1,1)";
+        if (!activeCard) return;
+
+        articlePage.style.left = "0px";
+        articlePage.style.top = "0px";
+        articlePage.style.width = "100vw";
+        articlePage.style.height = "100vh";
         articlePage.style.borderRadius = "0px";
-        if (morphGlass) {
-            morphGlass.remove();
-            morphGlass = null;
-        }
+        articlePage.style.overflowY = "auto";
+        articlePage.style.pointerEvents = "auto";
+
+        articlePage.classList.add("ios26-glass-settled");
         articleAnimation = null;
     };
 }
 
-function closeArticle() {
-    if (!activeCard || !sourceMorphRect) return;
 
-    /* 打开阶段可打断：原路 reverse，而不是重新计算终点。 */
-    if (articleAnimation) {
+function closeArticle() {
+    if (!activeCard) return;
+
+    /*
+     * 如果打开动画尚未结束：
+     * 直接反向同一条 Web Animation。
+     * 这是真正的“原路返回”，而不是重新生成一条路径。
+     */
+    if (articleAnimation && articleAnimation.playState === "running") {
         hideArticleContent();
+
         articleAnimation.reverse();
-        articleAnimation.onfinish = finishCloseArticle;
+
+        articleAnimation.onfinish = () => {
+            finishCloseArticle();
+        };
+
+        if (backgroundAnimation) {
+            backgroundAnimation.reverse();
+        }
+
         return;
     }
 
     hideArticleContent();
 
-    const target = sourceMorphRect;
-    const targetTransform =
-        `translate3d(${target.left}px, ${target.top}px, 0) ` +
-        `scale(${target.width / window.innerWidth}, ${target.height / window.innerHeight})`;
+    const rect = activeMorphRect;
 
-    /* Glass 层从全屏重新覆盖，再缩回保存的源矩形。 */
-    const glass = makeMorphGlass({
-        left: 0,
-        top: 0,
-        width: window.innerWidth,
-        height: window.innerHeight
-    });
-    glass.style.borderRadius = "0px";
-    glass.style.opacity = ".001";
+    if (!rect) {
+        finishCloseArticle();
+        return;
+    }
 
-    animateBackground(false);
-
+    /*
+     * 正常返回也使用点击瞬间保存的 sourceRect。
+     */
     articleAnimation = articlePage.animate(
         [
             {
-                transform: "translate3d(0,0,0) scale(1,1)",
+                left: "0px",
+                top: "0px",
+                width: "100vw",
+                height: "100vh",
                 borderRadius: "0px"
             },
             {
-                transform: targetTransform,
+                left: `${-window.innerWidth * .008}px`,
+                top: `${-window.innerHeight * .008}px`,
+                width: `${window.innerWidth * 1.016}px`,
+                height: `${window.innerHeight * 1.016}px`,
+                borderRadius: "7px"
+            },
+            {
+                left: `${rect.left - rect.width * .28}px`,
+                top: `${rect.top - rect.height * .32}px`,
+                width: `${rect.width * 1.56}px`,
+                height: `${rect.height * 1.72}px`,
+                borderRadius: "42px"
+            },
+            {
+                left: `${rect.left}px`,
+                top: `${rect.top}px`,
+                width: `${rect.width}px`,
+                height: `${rect.height}px`,
                 borderRadius: "26px"
             }
         ],
         {
             duration: CLOSE_DURATION,
-            easing: EASE_IN_OUT_CUBIC,
+            easing:
+                "linear(0, .015 6%, .09 17%, .25 34%, .48 53%, .68 70%, .84 84%, .95 94%, 1 100%)",
             fill: "forwards"
         }
     );
 
-    glass.animate(
-        [
-            { opacity: 0, borderRadius: "0px" },
-            { opacity: .52, borderRadius: "8px", offset: .20 },
-            { opacity: .94, borderRadius: "26px" }
-        ],
-        {
-            duration: CLOSE_DURATION,
-            easing: EASE_IN_OUT_CUBIC,
-            fill: "forwards"
-        }
-    );
+    if (mainWrapper) {
+        if (backgroundAnimation) backgroundAnimation.cancel();
 
-    articleAnimation.onfinish = finishCloseArticle;
+        backgroundAnimation = mainWrapper.animate(
+            [
+                { filter: "brightness(.55) saturate(.90)" },
+                { filter: "brightness(.82) saturate(.97)", offset: .70 },
+                { filter: "brightness(1) saturate(1)" }
+            ],
+            {
+                duration: 245,
+                easing: "cubic-bezier(.22,1,.36,1)",
+                fill: "forwards"
+            }
+        );
+    }
+
+    setTimeout(() => {
+        if (activeCard) {
+            activeCard.classList.remove("morph-hidden");
+        }
+    }, 205);
+
+    articleAnimation.onfinish = () => {
+        finishCloseArticle();
+    };
 }
 
-backBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    closeArticle();
-});
 
+/** 关闭动画结束后的清理 */
+function finishCloseArticle() {
+    if (articleAnimation) {
+        articleAnimation.cancel();
+    }
+
+    if (backgroundAnimation) {
+        backgroundAnimation.cancel();
+    }
+
+    overlay.classList.remove("active");
+
+    document.body.classList.remove(
+        "article-mode",
+        "ios26-morph-running"
+    );
+
+    if (activeCard) {
+        activeCard.classList.remove("morph-hidden");
+        activeCard.style.transform = "";
+        activeCard.style.opacity = "";
+    }
+
+    articlePage.style.transition = "none";
+    articlePage.style.left = "0px";
+    articlePage.style.top = "0px";
+    articlePage.style.width = "100vw";
+    articlePage.style.height = "100vh";
+    articlePage.style.borderRadius = "0px";
+    articlePage.style.opacity = "";
+    articlePage.style.visibility = "";
+    articlePage.style.overflowY = "auto";
+    articlePage.style.pointerEvents = "";
+    articlePage.classList.remove(
+        "ios26-glass-morph",
+        "ios26-glass-settled"
+    );
+
+    if (mainWrapper) {
+        mainWrapper.style.filter = "";
+        mainWrapper.style.transition = "";
+    }
+
+    document.body.style.overflow = "";
+
+    articleAnimation = null;
+    backgroundAnimation = null;
+    activeCard = null;
+    currentPostId = "";
+    activeMorphRect = null;
+
+    history.replaceState(null, "", window.location.pathname);
+}
+
+
+backBtn.addEventListener(
+    "click",
+    (e) => {
+        e.preventDefault();
+        closeArticle();
+    }
+);
 
 /* ================================================================
    8. 分享

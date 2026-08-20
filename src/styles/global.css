@@ -2891,72 +2891,201 @@
         }
 
 
+/* ================================================================
+   iOS26 Liquid Glass Article Morph
+   ------------------------------------------------
+   与 src/scripts/app.ts 的 300ms 同源形变动画配套。
+   这里不改变原有 Liquid Glass 视觉，只覆盖 Morph 所需的
+   几何动画、内容分层和背景时序。
+   ================================================================ */
 
+/* 背景暗化完全交给 app.ts 的 Web Animations API，避免 0ms 突然变暗。 */
+#mainWrapper {
+    transition:
+        opacity 320ms var(--ease-fluid),
+        transform 420ms var(--ease-fluid),
+        filter 260ms ease;
+}
+
+body.article-mode #mainWrapper {
+    opacity: 1;
+    transform: none;
+    pointer-events: none;
+    /* 不在这里写 brightness，防止覆盖 JS 的 55ms 延迟。 */
+}
+
+/* Overlay 只负责承载文章页面，不负责 Morph 几何。 */
+#articleOverlay {
+    overflow: hidden;
+}
 
 /* ================================================================
-   iOS26 Glass Morph —— 稳定增强层
-   Glass 层不承载文章内容，只负责玻璃表面与高光，
-   因此不会破坏原 articleOverlay / articlePage 的打开逻辑。
+   Morph 容器
    ================================================================ */
-.ios26-glass-morph-layer {
+.article-page {
     position: fixed;
-    z-index: 10001;
-    pointer-events: none;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
     box-sizing: border-box;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,.20);
-    background:
-        linear-gradient(135deg,
-            rgba(255,255,255,.20),
-            rgba(255,255,255,.06) 45%,
-            rgba(255,255,255,.015));
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.28),
-        0 18px 50px rgba(0,0,0,.12);
-    backdrop-filter: blur(10px) saturate(1.08);
-    -webkit-backdrop-filter: blur(10px) saturate(1.08);
-    will-change: transform, border-radius, opacity, backdrop-filter;
+
+    overflow-x: hidden;
+    overflow-y: auto;
+
+    /* 不再使用 transform scale 作为主 Morph 手段。 */
+    transform: none;
+    transform-origin: top left;
+
+    /* JS 通过 left/top/width/height/radius 做真实几何形变。 */
+    will-change:
+        left,
+        top,
+        width,
+        height,
+        border-radius;
+
+    transition: none !important;
+    isolation: isolate;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
-.ios26-glass-morph-layer::before {
-    content: "";
-    position: absolute;
-    inset: -45%;
-    border-radius: inherit;
-    background:
-        radial-gradient(circle at 20% 18%,
-            rgba(255,255,255,.42),
-            rgba(255,255,255,.10) 22%,
-            transparent 48%);
-    transform: translate3d(0,0,0);
+/* 内容层独立运动，避免文字和图片跟着外壳一起缩放。 */
+#articleContent {
+    will-change: opacity, transform;
+}
+
+#articleContent.content-hidden {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.985);
+    transition:
+        opacity 90ms ease,
+        transform 120ms ease;
+}
+
+#articleContent.content-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    transition:
+        opacity 125ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 原卡片只隐藏视觉，不改变 DOM，保证返回时能精准读取原始位置。 */
+.post-card.morph-hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+/* Morph 期间保持玻璃高光稳定。 */
+.article-page::before {
     pointer-events: none;
+    will-change: opacity;
 }
 
-.ios26-glass-morph-layer::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(110deg,
-        transparent 0%,
-        rgba(255,255,255,.20) 45%,
-        transparent 60%);
-    transform: translateX(-85%);
-    animation: ios26GlassSheen 300ms cubic-bezier(.22,1,.36,1) both;
-    pointer-events: none;
-}
-
-@keyframes ios26GlassSheen {
-    from { transform: translateX(-85%); }
-    to   { transform: translateX(85%); }
-}
-
+/* 文章打开后允许内部按钮/滚动交互。 */
 #articleOverlay.active .article-page {
     pointer-events: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .ios26-glass-morph-layer::after {
-        animation: none;
+    .article-page {
+        transition: none !important;
+        animation: none !important;
     }
+
+    #articleContent {
+        transition: none !important;
+    }
+}
+
+/* ================================================================
+   iOS26 Glass Morph - stable same-frame handoff
+   ================================================================ */
+
+body.ios26-morph-running #mainWrapper {
+    filter: brightness(1) saturate(1) !important;
+}
+
+.article-page.ios26-glass-morph {
+    overflow: hidden !important;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255,255,255,.20),
+            rgba(255,255,255,.075) 42%,
+            rgba(255,255,255,.025)
+        ) !important;
+    backdrop-filter:
+        blur(24px)
+        saturate(1.25) !important;
+    -webkit-backdrop-filter:
+        blur(24px)
+        saturate(1.25) !important;
+    box-shadow:
+        0 18px 55px rgba(0,0,0,.18),
+        inset 0 1px 0 rgba(255,255,255,.30),
+        inset 0 -1px 0 rgba(255,255,255,.08) !important;
+    will-change:
+        left, top, width, height, border-radius,
+        box-shadow, filter;
+}
+
+.article-page.ios26-glass-morph::before {
+    content: "";
+    position: absolute;
+    inset: -45%;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+        radial-gradient(
+            ellipse at 22% 15%,
+            rgba(255,255,255,.48),
+            rgba(255,255,255,.13) 20%,
+            transparent 48%
+        );
+    transform: translate3d(-8%,-5%,0) rotate(-7deg);
+    opacity: .75;
+}
+
+.article-page.ios26-glass-morph::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+        linear-gradient(
+            115deg,
+            transparent 0%,
+            rgba(255,255,255,.22) 38%,
+            rgba(255,255,255,.045) 49%,
+            transparent 62%
+        );
+    transform: translate3d(-75%,0,0);
+    opacity: .68;
+}
+
+.article-page.ios26-glass-morph > * {
+    position: relative;
+    z-index: 1;
+}
+
+.article-page.ios26-glass-settled {
+    backdrop-filter:
+        blur(22px)
+        saturate(1.18) !important;
+    -webkit-backdrop-filter:
+        blur(22px)
+        saturate(1.18) !important;
+}
+
+body.ios26-morph-running .post-card.morph-hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
