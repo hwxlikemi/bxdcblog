@@ -1,4 +1,4 @@
-        /* =========================================================
+    /* =========================================================
            1. 基础变量
         ========================================================= */
 
@@ -2954,4 +2954,47 @@ body.article-mode #mainWrapper {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
     }
+}
+
+
+/* ================================================================
+   iOS26 Liquid Glass Morph — 稳定层
+   ================================================================ */
+
+#articlePage {
+    position: fixed !important;
+    box-sizing: border-box;
+    transform: none !important;
+    transform-origin: top left !important;
+    transition: none !important;
+    will-change: left, top, width, height, border-radius, opacity;
+}
+
+#articleOverlay {
+    overflow: hidden !important;
+}
+
+body.ios26-liquid-morphing #articleOverlay {
+    background: transparent !important;
+}
+
+body.ios26-liquid-opening #articleContent,
+body.ios26-liquid-closing #articleContent {
+    visibility: hidden !important;
+}
+
+body.ios26-liquid-app-visible #articleContent {
+    visibility: visible !important;
+}
+
+.post-card.ios26-morph-source {
+    z-index: 1 !important;
+    transition: none !important;
+}
+
+.post-card.ios26-morph-source-hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: none !important;
 }

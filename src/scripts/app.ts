@@ -770,26 +770,24 @@ document
 
 /* ================================================================
    6. 文章卡片 Morph 动画
-   iOS26 Liquid Glass Shared-Element Morph
+   iOS26 Liquid Glass — 稳定版
 
-   关键参数：
-   - OPEN_DURATION / CLOSE_DURATION：总时长 300ms
-   - BACKGROUND_DELAY：背景滞后 55ms
-   - CONTENT_FADE_DELAY：App 内容约 165ms 开始进入
-   - CARD_RADIUS：源卡片圆角 26px
-   - OVERSHOOT：末尾仅约 0.7% 的弱弹簧过冲
-
-   视觉结构：
-   源卡片 → Liquid Glass Morph 层 → 全屏 Article
-   而不是简单 scale 一个页面。
+   关键修复：
+   1. 打开时 articlePage 在 Morph 完成前保持不可见，彻底消除“旧世界闪一下”。
+   2. 源卡片永远位于 Glass 层下面，不会穿过玻璃层抢画面。
+   3. 保存点击瞬间的 sourceRect，返回永远使用这一个坐标，不重新读取漂移后的卡片位置。
+   4. 打开/返回使用严格镜像的同一组几何关键帧。
+   5. 返回开始时 Glass 先完整覆盖 App，再让 App 内容退出，因此不会先看到页面跳变。
+   6. Glass 最后才淡出，源卡片最后 55ms 才恢复可见。
    ================================================================ */
 
 let activeCard = null;
 let currentPostId = "";
-let articleAnimation = null;
+let sourceMorphRect = null;
+let morphRunId = 0;
 let glassAnimation = null;
+let glassHighlightAnimation = null;
 let backgroundAnimation = null;
-let contentFadeTimer = null;
 let pressAnimation = null;
 let articleMorphDirection = null;
 
@@ -799,22 +797,23 @@ const articleContent = document.getElementById("articleContent");
 const backBtn = document.getElementById("backBtn");
 const mainWrapper = document.getElementById("mainWrapper");
 
-const OPEN_DURATION = 300;
-const CLOSE_DURATION = 300;
-const PRESS_DURATION = 72;
-const BACKGROUND_DELAY = 55;
-const BACKGROUND_DURATION = 230;
-const CONTENT_FADE_DELAY = 165;
-const SOURCE_FADE_TIME = 145;
-const CARD_RADIUS = 26;
-const FULL_RADIUS = 0;
-const OVERSHOOT = 1.007;
+/* ======================== 可调关键参数 ======================== */
+const MORPH_OPEN_MS = 300;
+const MORPH_CLOSE_MS = 300;
+const MORPH_PRESS_MS = 70;
+const MORPH_BACKGROUND_DELAY_MS = 55;
+const MORPH_BACKGROUND_MS = 245;
+const MORPH_APP_REVEAL_MS = 178;
+const MORPH_SOURCE_HIDE_MS = 145;
+const MORPH_SOURCE_RESTORE_MS = 235;
+const MORPH_CARD_RADIUS = 26;
+const MORPH_INTERMEDIATE_RADIUS = 44;
+const MORPH_FULL_RADIUS = 0;
+const MORPH_WEAK_OVERSHOOT = 1.006;
 
-const LIQUID_SPRING =
-    "linear(0, .10 7%, .25 18%, .48 35%, .70 53%, .85 69%, .94 82%, .992 91%, 1.007 96%, .999 99%, 1 100%)";
-
-const LIQUID_CLOSE =
-    "linear(0, .015 6%, .09 17%, .25 34%, .48 53%, .68 70%, .84 84%, .95 94%, 1 100%)";
+const MORPH_EASE = "cubic-bezier(.22,1,.36,1)";
+const MORPH_SPRING =
+    "linear(0, .12 8%, .28 20%, .50 38%, .70 55%, .84 70%, .94 83%, .992 92%, 1.006 97%, .999 99%, 1 100%)";
 
 function ensureLiquidGlassLayer() {
     if (document.getElementById("ios26MorphGlassStyle")) return;
@@ -822,26 +821,27 @@ function ensureLiquidGlassLayer() {
     const style = document.createElement("style");
     style.id = "ios26MorphGlassStyle";
     style.textContent = `
+        /* Glass 是唯一负责“连续形变”的视觉层 */
         #ios26MorphGlass {
             position: fixed;
-            z-index: 99999;
+            z-index: 2147483000;
             left: 0;
             top: 0;
             width: 0;
             height: 0;
+            box-sizing: border-box;
             overflow: hidden;
             pointer-events: none;
-            box-sizing: border-box;
-            border: 1px solid rgba(255,255,255,.22);
+            border: 1px solid rgba(255,255,255,.20);
             background:
                 linear-gradient(135deg,
-                    rgba(255,255,255,.30),
-                    rgba(255,255,255,.10) 42%,
-                    rgba(255,255,255,.035));
-            backdrop-filter: blur(24px) saturate(1.25);
-            -webkit-backdrop-filter: blur(24px) saturate(1.25);
+                    rgba(255,255,255,.34),
+                    rgba(255,255,255,.13) 44%,
+                    rgba(255,255,255,.045));
+            backdrop-filter: blur(25px) saturate(1.25);
+            -webkit-backdrop-filter: blur(25px) saturate(1.25);
             box-shadow:
-                0 18px 55px rgba(0,0,0,.18),
+                0 18px 55px rgba(0,0,0,.16),
                 inset 0 1px 0 rgba(255,255,255,.34),
                 inset 0 -1px 0 rgba(255,255,255,.08);
             will-change:
@@ -852,14 +852,14 @@ function ensureLiquidGlassLayer() {
         #ios26MorphGlass::before {
             content: "";
             position: absolute;
-            inset: -50%;
+            inset: -55%;
             border-radius: inherit;
             background:
-                radial-gradient(ellipse at 20% 12%,
-                    rgba(255,255,255,.62) 0%,
-                    rgba(255,255,255,.20) 17%,
+                radial-gradient(ellipse at 20% 13%,
+                    rgba(255,255,255,.58) 0%,
+                    rgba(255,255,255,.18) 18%,
                     transparent 48%);
-            transform: translate3d(-12%,-7%,0) rotate(-8deg);
+            transform: translate3d(-10%,-7%,0) rotate(-7deg);
             opacity: .78;
             will-change: transform, opacity;
         }
@@ -873,35 +873,31 @@ function ensureLiquidGlassLayer() {
                 linear-gradient(112deg,
                     transparent 0%,
                     transparent 34%,
-                    rgba(255,255,255,.30) 45%,
-                    rgba(255,255,255,.08) 51%,
+                    rgba(255,255,255,.28) 45%,
+                    rgba(255,255,255,.07) 51%,
                     transparent 63%);
             transform: translate3d(-78%,0,0);
-            opacity: .72;
+            opacity: .70;
             will-change: transform, opacity;
         }
 
-        body.ios26-liquid-morphing #articleOverlay {
-            background: transparent !important;
+        /* 打开/返回期间，真实 App 页面绝不能抢先露出来。 */
+        body.ios26-liquid-morphing #articlePage {
+            transition: none !important;
         }
 
-        body.ios26-liquid-opening #articleContent {
+        body.ios26-liquid-opening #articleContent,
+        body.ios26-liquid-closing #articleContent {
             opacity: 0 !important;
-            transform: translate3d(0,10px,0) scale(.985);
+            visibility: hidden !important;
         }
 
-        body.ios26-liquid-opened #articleContent {
-            opacity: 1 !important;
-            transform: translate3d(0,0,0) scale(1);
-            transition:
-                opacity 130ms cubic-bezier(.22,1,.36,1),
-                transform 170ms cubic-bezier(.22,1,.36,1);
-        }
-
+        /* 源卡片必须在 Glass 下方，避免打开时出现旧卡片闪烁。 */
         .post-card.ios26-morph-source {
-            z-index: 100000 !important;
-            transform: translate3d(0,1px,0) scale(.975) !important;
-            filter: brightness(1.06) saturate(1.08);
+            position: relative;
+            z-index: 1 !important;
+            transform: translate3d(0,1px,0) scale(.978) !important;
+            filter: brightness(1.045) saturate(1.06);
             transition: none !important;
         }
 
@@ -911,21 +907,29 @@ function ensureLiquidGlassLayer() {
             pointer-events: none !important;
             transition: none !important;
         }
+
+        /* App 内容只在 Glass 已经覆盖住画面后才允许出现。 */
+        body.ios26-liquid-app-visible #articleContent {
+            opacity: 1 !important;
+            visibility: visible !important;
+            transform: none !important;
+            transition:
+                opacity 115ms ${MORPH_EASE},
+                transform 140ms ${MORPH_EASE};
+        }
     `;
     document.head.appendChild(style);
 }
 
-function cancelAllAnimations() {
-    if (articleAnimation) articleAnimation.cancel();
+function cancelMorphAnimations() {
     if (glassAnimation) glassAnimation.cancel();
+    if (glassHighlightAnimation) glassHighlightAnimation.cancel();
     if (backgroundAnimation) backgroundAnimation.cancel();
     if (pressAnimation) pressAnimation.cancel();
-    if (contentFadeTimer) clearTimeout(contentFadeTimer);
-    articleAnimation = null;
     glassAnimation = null;
+    glassHighlightAnimation = null;
     backgroundAnimation = null;
     pressAnimation = null;
-    contentFadeTimer = null;
 }
 
 function getCardRect(card) {
@@ -938,25 +942,18 @@ function getCardRect(card) {
     };
 }
 
-function hideArticleContent() {
-    if (contentFadeTimer) clearTimeout(contentFadeTimer);
-    articleContent.classList.remove("content-visible");
-    articleContent.classList.add("content-hidden");
+function createGlass() {
+    const old = document.getElementById("ios26MorphGlass");
+    if (old) old.remove();
+
+    const glass = document.createElement("div");
+    glass.id = "ios26MorphGlass";
+    document.body.appendChild(glass);
+    return glass;
 }
 
-function showArticleContent() {
-    if (contentFadeTimer) clearTimeout(contentFadeTimer);
-    contentFadeTimer = setTimeout(() => {
-        if (articleMorphDirection !== "open") return;
-        articleContent.classList.remove("content-hidden");
-        articleContent.classList.add("content-visible");
-        document.body.classList.remove("ios26-liquid-opening");
-        document.body.classList.add("ios26-liquid-opened");
-        contentFadeTimer = null;
-    }, CONTENT_FADE_DELAY);
-}
-
-function pressCard(card) {
+function pressSource(card) {
+    if (pressAnimation) pressAnimation.cancel();
     pressAnimation = card.animate([
         {
             transform: "translate3d(0,0,0) scale(1)",
@@ -964,15 +961,15 @@ function pressCard(card) {
         },
         {
             transform: "translate3d(0,1px,0) scale(.972)",
-            filter: "brightness(1.06) saturate(1.08)"
+            filter: "brightness(1.05) saturate(1.07)"
         },
         {
-            transform: "translate3d(0,0,0) scale(.985)",
-            filter: "brightness(1.02) saturate(1.04)"
+            transform: "translate3d(0,0,0) scale(.978)",
+            filter: "brightness(1.045) saturate(1.06)"
         }
     ], {
-        duration: PRESS_DURATION,
-        easing: "cubic-bezier(.22,1,.36,1)",
+        duration: MORPH_PRESS_MS,
+        easing: MORPH_EASE,
         fill: "forwards"
     });
 }
@@ -981,12 +978,12 @@ function animateBackgroundOpen() {
     if (!mainWrapper) return;
     backgroundAnimation = mainWrapper.animate([
         { filter: "brightness(1) saturate(1)" },
-        { filter: "brightness(.88) saturate(.98)", offset: .20 },
-        { filter: "brightness(.58) saturate(.88)" }
+        { filter: "brightness(.92) saturate(.99)", offset: .24 },
+        { filter: "brightness(.62) saturate(.90)" }
     ], {
-        duration: BACKGROUND_DURATION,
-        delay: BACKGROUND_DELAY,
-        easing: "cubic-bezier(.22,1,.36,1)",
+        duration: MORPH_BACKGROUND_MS,
+        delay: MORPH_BACKGROUND_DELAY_MS,
+        easing: MORPH_EASE,
         fill: "forwards"
     });
 }
@@ -994,45 +991,34 @@ function animateBackgroundOpen() {
 function animateBackgroundClose() {
     if (!mainWrapper) return;
     backgroundAnimation = mainWrapper.animate([
-        { filter: "brightness(.58) saturate(.88)" },
-        { filter: "brightness(.86) saturate(.98)", offset: .72 },
+        { filter: "brightness(.62) saturate(.90)" },
+        { filter: "brightness(.90) saturate(.99)", offset: .78 },
         { filter: "brightness(1) saturate(1)" }
     ], {
-        duration: BACKGROUND_DURATION,
-        easing: "cubic-bezier(.22,1,.36,1)",
+        duration: MORPH_BACKGROUND_MS,
+        easing: MORPH_EASE,
         fill: "forwards"
     });
 }
 
-function createGlass(rect) {
-    const old = document.getElementById("ios26MorphGlass");
-    if (old) old.remove();
+function prepareArticleHidden() {
+    document.body.classList.remove("ios26-liquid-app-visible");
+    document.body.classList.add("ios26-liquid-opening");
 
-    const glass = document.createElement("div");
-    glass.id = "ios26MorphGlass";
-    glass.style.left = `${rect.left}px`;
-    glass.style.top = `${rect.top}px`;
-    glass.style.width = `${rect.width}px`;
-    glass.style.height = `${rect.height}px`;
-    glass.style.borderRadius = `${CARD_RADIUS}px`;
-    document.body.appendChild(glass);
-    return glass;
+    articlePage.style.transition = "none";
+    articlePage.style.opacity = "0";
+    articlePage.style.pointerEvents = "none";
 }
 
-function openArticle(card, postId, title, date, category) {
-    if (!card || !articlePage || !overlay) return;
+function revealArticleBehindGlass() {
+    if (articleMorphDirection !== "open") return;
 
-    ensureLiquidGlassLayer();
-    cancelAllAnimations();
+    articlePage.style.opacity = "1";
+    document.body.classList.remove("ios26-liquid-opening");
+    document.body.classList.add("ios26-liquid-app-visible");
+}
 
-    activeCard = card;
-    currentPostId = postId;
-    articleMorphDirection = "open";
-
-    const source = getCardRect(card);
-
-    if (postId) history.replaceState(null, "", `#post-${postId}`);
-
+function loadArticleContent(card, title, date, category) {
     document.getElementById("viewTitle").innerText = title;
     document.getElementById("viewMeta").innerHTML = `
         <i class="fa-regular fa-calendar"></i>
@@ -1045,61 +1031,96 @@ function openArticle(card, postId, title, date, category) {
     const template = card.querySelector("template[data-post-html]");
     const rawHtml = template ? template.innerHTML : "";
     const viewBody = document.getElementById("viewBody");
+
     viewBody.innerHTML = enhanceMarkdownHtml(rawHtml);
     enhanceMarkdownDom(viewBody);
+}
 
-    document.body.classList.add("article-mode", "ios26-liquid-morphing", "ios26-liquid-opening");
-    document.body.classList.remove("ios26-liquid-opened");
+function openArticle(card, postId, title, date, category) {
+    if (!card || !articlePage || !overlay) return;
+
+    ensureLiquidGlassLayer();
+    cancelMorphAnimations();
+
+    morphRunId += 1;
+    const runId = morphRunId;
+
+    activeCard = card;
+    currentPostId = postId;
+    articleMorphDirection = "open";
+
+    /* 关键：只在点击瞬间读取一次源矩形。 */
+    sourceMorphRect = getCardRect(card);
+
+    if (postId) history.replaceState(null, "", `#post-${postId}`);
+
+    loadArticleContent(card, title, date, category);
+
+    document.body.classList.add(
+        "article-mode",
+        "ios26-liquid-morphing"
+    );
     overlay.classList.add("active");
     document.body.style.overflow = "hidden";
 
-    hideArticleContent();
-    card.classList.add("ios26-morph-source");
-    pressCard(card);
+    /*
+     * 旧世界先保持原样；articlePage 完全 opacity 0。
+     * 因此不会出现“旧文章页先闪一下”的问题。
+     */
+    prepareArticleHidden();
 
-    articlePage.style.transition = "none";
+    card.classList.add("ios26-morph-source");
+    pressSource(card);
+
+    const source = sourceMorphRect;
+    const glass = createGlass();
+
+    /* Glass 从源卡片的真实坐标起步。 */
+    glass.style.left = `${source.left}px`;
+    glass.style.top = `${source.top}px`;
+    glass.style.width = `${source.width}px`;
+    glass.style.height = `${source.height}px`;
+    glass.style.borderRadius = `${MORPH_CARD_RADIUS}px`;
+    glass.style.opacity = "1";
+
+    /*
+     * ArticlePage 在玻璃下面预先定位。
+     * 它在 178ms 才变成可见，且此时 Glass 已覆盖整个画面，
+     * 所以用户看不到“页面从源卡片突然跳到全屏”的瞬间。
+     */
     articlePage.style.left = `${source.left}px`;
     articlePage.style.top = `${source.top}px`;
     articlePage.style.width = `${source.width}px`;
     articlePage.style.height = `${source.height}px`;
-    articlePage.style.borderRadius = `${CARD_RADIUS}px`;
-    articlePage.style.opacity = "1";
+    articlePage.style.borderRadius = `${MORPH_CARD_RADIUS}px`;
     articlePage.style.overflowY = "hidden";
-    articlePage.style.pointerEvents = "none";
 
-    articlePage.getBoundingClientRect();
     animateBackgroundOpen();
 
-    const glass = createGlass(source);
     const W = window.innerWidth;
     const H = window.innerHeight;
     const cx = source.left + source.width / 2;
     const cy = source.top + source.height / 2;
 
-    /* ------------------------------------------------------------
-       0-200ms：Glass 容器从“被点击卡片”向四周摊开。
-       这里故意不用 scale 整个 App，而是改变真实几何边界。
-       ------------------------------------------------------------ */
-    glassAnimation = glass.animate([
+    /* 唯一一组几何关键帧；返回时严格倒放。 */
+    const openFrames = [
         {
             left: `${source.left}px`,
             top: `${source.top}px`,
             width: `${source.width}px`,
             height: `${source.height}px`,
-            borderRadius: `${CARD_RADIUS}px`,
+            borderRadius: `${MORPH_CARD_RADIUS}px`,
             opacity: 1,
-            filter: "blur(0px) saturate(1)",
-            boxShadow: "0 8px 28px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.30)"
+            filter: "blur(0px) saturate(1)"
         },
         {
-            left: `${cx - source.width * .68}px`,
-            top: `${cy - source.height * .76}px`,
-            width: `${source.width * 2.36}px`,
-            height: `${source.height * 2.52}px`,
-            borderRadius: "44px",
+            left: `${cx - source.width * .67}px`,
+            top: `${cy - source.height * .74}px`,
+            width: `${source.width * 2.34}px`,
+            height: `${source.height * 2.50}px`,
+            borderRadius: `${MORPH_INTERMEDIATE_RADIUS}px`,
             opacity: 1,
-            filter: "blur(1px) saturate(1.20)",
-            boxShadow: "0 18px 54px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.34)"
+            filter: "blur(1px) saturate(1.18)"
         },
         {
             left: `${-W * .012}px`,
@@ -1108,172 +1129,249 @@ function openArticle(card, postId, title, date, category) {
             height: `${H * 1.024}px`,
             borderRadius: "7px",
             opacity: 1,
-            filter: "blur(1.5px) saturate(1.12)",
-            boxShadow: "0 20px 62px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.20)"
+            filter: "blur(1.25px) saturate(1.12)"
         },
         {
             left: "0px",
             top: "0px",
             width: `${W}px`,
             height: `${H}px`,
-            borderRadius: `${FULL_RADIUS}px`,
-            opacity: 0,
-            filter: "blur(0px) saturate(1)",
-            boxShadow: "0 0 0 rgba(0,0,0,0)"
+            borderRadius: `${MORPH_FULL_RADIUS}px`,
+            opacity: 1,
+            filter: "blur(0px) saturate(1)"
+        }
+    ];
+
+    /*
+     * 0-300ms：Glass 连续扩张。
+     * 注意：这里最后保持 opacity=1，直到 App 已经接管画面后
+     * 才单独 fade Glass，这正是消除“旧世界闪一下”的关键。
+     */
+    glassAnimation = glass.animate(openFrames, {
+        duration: MORPH_OPEN_MS,
+        easing: MORPH_SPRING,
+        fill: "forwards"
+    });
+
+    glassHighlightAnimation = glass.animate([
+        {
+            transform: "translate3d(-78%,0,0) rotate(-4deg)",
+            opacity: .72
+        },
+        {
+            transform: "translate3d(-12%,1%,0) rotate(-1deg)",
+            opacity: .58
+        },
+        {
+            transform: "translate3d(62%,5%,0) rotate(2deg)",
+            opacity: .24
+        },
+        {
+            transform: "translate3d(105%,8%,0) rotate(3deg)",
+            opacity: 0
         }
     ], {
-        duration: OPEN_DURATION,
-        easing: LIQUID_SPRING,
+        duration: MORPH_OPEN_MS,
+        easing: MORPH_EASE,
         fill: "forwards"
     });
 
-    /* ------------------------------------------------------------
-       Glass 高光层：0-300ms 横向扫过，制造“液体表面”运动。
-       ------------------------------------------------------------ */
-    glass.animate([
-        { transform: "translate3d(-78%,0,0) rotate(-4deg)", opacity: .72 },
-        { transform: "translate3d(-5%,2%,0) rotate(-1deg)", opacity: .58 },
-        { transform: "translate3d(72%,6%,0) rotate(2deg)", opacity: .20 },
-        { transform: "translate3d(105%,8%,0) rotate(3deg)", opacity: 0 }
-    ], {
-        duration: OPEN_DURATION,
-        easing: "cubic-bezier(.22,1,.36,1)",
-        fill: "forwards"
-    });
-
-    /* 145ms：源卡片 UI 淡出，但 Glass 仍然覆盖在同一个几何层上。 */
+    /* 178ms：App 在 Glass 后面接管。 */
     setTimeout(() => {
-        if (articleMorphDirection !== "open") return;
+        if (runId !== morphRunId || articleMorphDirection !== "open") return;
+        revealArticleBehindGlass();
+    }, MORPH_APP_REVEAL_MS);
+
+    /* 235ms：源卡片才允许恢复/退出最终遮挡关系。 */
+    setTimeout(() => {
+        if (runId !== morphRunId || articleMorphDirection !== "open") return;
         card.classList.remove("ios26-morph-source");
         card.classList.add("ios26-morph-source-hidden");
-    }, SOURCE_FADE_TIME);
-
-    /* 165ms：App 内容开始进入，和源 UI 形成交叉。 */
-    showArticleContent();
+    }, MORPH_SOURCE_FADE_TIME);
 
     glassAnimation.onfinish = () => {
-        if (articleMorphDirection !== "open") return;
+        if (runId !== morphRunId || articleMorphDirection !== "open") return;
 
-        glass.remove();
-        articlePage.style.left = "0px";
-        articlePage.style.top = "0px";
-        articlePage.style.width = "100vw";
-        articlePage.style.height = "100vh";
-        articlePage.style.borderRadius = `${FULL_RADIUS}px`;
-        articlePage.style.overflowY = "auto";
-        articlePage.style.pointerEvents = "auto";
-        glassAnimation = null;
+        /* Glass 已经全屏；现在才把它淡掉。 */
+        const fade = glass.animate(
+            [
+                { opacity: 1 },
+                { opacity: 0 }
+            ],
+            {
+                duration: 48,
+                easing: MORPH_EASE,
+                fill: "forwards"
+            }
+        );
+
+        fade.onfinish = () => {
+            if (runId !== morphRunId || articleMorphDirection !== "open") return;
+
+            glass.remove();
+            articlePage.style.left = "0px";
+            articlePage.style.top = "0px";
+            articlePage.style.width = "100vw";
+            articlePage.style.height = "100vh";
+            articlePage.style.borderRadius = `${MORPH_FULL_RADIUS}px`;
+            articlePage.style.overflowY = "auto";
+            articlePage.style.pointerEvents = "auto";
+            glassAnimation = null;
+        };
     };
 }
 
 function closeArticle() {
-    if (!activeCard || !articlePage) return;
+    if (!activeCard || !articlePage || !sourceMorphRect) return;
 
     ensureLiquidGlassLayer();
+    cancelMorphAnimations();
 
+    morphRunId += 1;
+    const runId = morphRunId;
     const card = activeCard;
-    const target = getCardRect(card);
+    const target = sourceMorphRect;
+
     articleMorphDirection = "close";
 
-    cancelAllAnimations();
-    hideArticleContent();
-    document.body.classList.remove("ios26-liquid-opened");
-    document.body.classList.add("ios26-liquid-opening", "ios26-liquid-morphing");
+    /*
+     * 返回前立刻把 App 内容隐藏，但 articlePage 本身仍然占满屏幕。
+     * 随后 Glass 以 opacity=1 覆盖全屏，用户不会看到底层页面跳变。
+     */
+    document.body.classList.remove("ios26-liquid-app-visible");
+    document.body.classList.add("ios26-liquid-closing", "ios26-liquid-morphing");
+    articlePage.style.opacity = "1";
     articlePage.style.pointerEvents = "none";
 
     animateBackgroundClose();
 
-    const glass = createGlass({
-        left: 0,
-        top: 0,
-        width: window.innerWidth,
-        height: window.innerHeight
-    });
-    glass.style.borderRadius = "0px";
-    glass.style.opacity = "0";
+    const glass = createGlass();
+    glass.style.left = "0px";
+    glass.style.top = "0px";
+    glass.style.width = "100vw";
+    glass.style.height = "100vh";
+    glass.style.borderRadius = `${MORPH_FULL_RADIUS}px`;
+    glass.style.opacity = "1";
 
-    /* ------------------------------------------------------------
-       反向：全屏 Glass → 扩散 → 精准回到源卡片。
-       圆角同步 0 → 44 → 26px。
-       ------------------------------------------------------------ */
-    glassAnimation = glass.animate([
+    /*
+     * 严格镜像：openFrames.reverse()。
+     * 这样返回的每一个几何阶段都与打开完全相反，
+     * 不再使用另一套近似坐标。
+     */
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const cx = target.left + target.width / 2;
+    const cy = target.top + target.height / 2;
+
+    const closeFrames = [
         {
             left: "0px",
             top: "0px",
-            width: "100vw",
-            height: "100vh",
-            borderRadius: "0px",
-            opacity: 0
+            width: `${W}px`,
+            height: `${H}px`,
+            borderRadius: `${MORPH_FULL_RADIUS}px`,
+            opacity: 1,
+            filter: "blur(0px) saturate(1)"
         },
         {
-            left: "0px",
-            top: "0px",
-            width: "100vw",
-            height: "100vh",
+            left: `${-W * .012}px`,
+            top: `${-H * .012}px`,
+            width: `${W * 1.024}px`,
+            height: `${H * 1.024}px`,
             borderRadius: "7px",
-            opacity: .94
+            opacity: 1,
+            filter: "blur(1.25px) saturate(1.12)"
         },
         {
-            left: `${target.left - target.width * .58}px`,
-            top: `${target.top - target.height * .76}px`,
-            width: `${target.width * 2.22}px`,
-            height: `${target.height * 2.46}px`,
-            borderRadius: "44px",
-            opacity: 1
+            left: `${cx - target.width * .67}px`,
+            top: `${cy - target.height * .74}px`,
+            width: `${target.width * 2.34}px`,
+            height: `${target.height * 2.50}px`,
+            borderRadius: `${MORPH_INTERMEDIATE_RADIUS}px`,
+            opacity: 1,
+            filter: "blur(1px) saturate(1.18)"
         },
         {
             left: `${target.left}px`,
             top: `${target.top}px`,
             width: `${target.width}px`,
             height: `${target.height}px`,
-            borderRadius: `${CARD_RADIUS}px`,
-            opacity: 1
+            borderRadius: `${MORPH_CARD_RADIUS}px`,
+            opacity: 1,
+            filter: "blur(0px) saturate(1)"
+        }
+    ];
+
+    glassAnimation = glass.animate(closeFrames, {
+        duration: MORPH_CLOSE_MS,
+        easing: MORPH_SPRING,
+        fill: "forwards"
+    });
+
+    glassHighlightAnimation = glass.animate([
+        {
+            transform: "translate3d(105%,8%,0) rotate(3deg)",
+            opacity: 0
+        },
+        {
+            transform: "translate3d(62%,5%,0) rotate(2deg)",
+            opacity: .24
+        },
+        {
+            transform: "translate3d(-12%,1%,0) rotate(-1deg)",
+            opacity: .58
+        },
+        {
+            transform: "translate3d(-78%,0,0) rotate(-4deg)",
+            opacity: .72
         }
     ], {
-        duration: CLOSE_DURATION,
-        easing: LIQUID_CLOSE,
+        duration: MORPH_CLOSE_MS,
+        easing: MORPH_EASE,
         fill: "forwards"
     });
 
-    glass.animate([
-        { transform: "translate3d(78%,8%,0) rotate(3deg)", opacity: 0 },
-        { transform: "translate3d(15%,4%,0) rotate(1deg)", opacity: .40 },
-        { transform: "translate3d(-42%,-2%,0) rotate(-2deg)", opacity: .62 },
-        { transform: "translate3d(-78%,-5%,0) rotate(-4deg)", opacity: .76 }
-    ], {
-        duration: CLOSE_DURATION,
-        easing: "cubic-bezier(.22,1,.36,1)",
-        fill: "forwards"
-    });
-
-    /* 145ms：源卡片先恢复，Glass 最后落位，避免视觉断层。 */
+    /* 235ms：Glass 已经接近源卡片，才恢复原卡片。 */
     setTimeout(() => {
-        if (articleMorphDirection !== "close") return;
+        if (runId !== morphRunId || articleMorphDirection !== "close") return;
         card.classList.remove("ios26-morph-source-hidden");
         card.classList.add("ios26-morph-source");
-    }, SOURCE_FADE_TIME);
+    }, MORPH_SOURCE_RESTORE_MS);
 
     glassAnimation.onfinish = () => {
-        finishCloseArticle();
-        glass.remove();
+        if (runId !== morphRunId || articleMorphDirection !== "close") return;
+
+        /* 最后 45ms 才让源卡片完整接管，避免“突然出现”。 */
+        const fade = glass.animate(
+            [
+                { opacity: 1 },
+                { opacity: 0 }
+            ],
+            {
+                duration: 45,
+                easing: MORPH_EASE,
+                fill: "forwards"
+            }
+        );
+
+        fade.onfinish = () => {
+            if (runId !== morphRunId || articleMorphDirection !== "close") return;
+            finishCloseArticle();
+            glass.remove();
+        };
     };
 }
 
 function finishCloseArticle() {
-    if (articleAnimation) articleAnimation.cancel();
-    if (glassAnimation) glassAnimation.cancel();
-    if (backgroundAnimation) backgroundAnimation.cancel();
-
-    articleAnimation = null;
-    glassAnimation = null;
-    backgroundAnimation = null;
+    cancelMorphAnimations();
 
     overlay.classList.remove("active");
     document.body.classList.remove(
         "article-mode",
         "ios26-liquid-morphing",
         "ios26-liquid-opening",
-        "ios26-liquid-opened"
+        "ios26-liquid-closing",
+        "ios26-liquid-app-visible"
     );
 
     if (activeCard) {
@@ -1295,11 +1393,13 @@ function finishCloseArticle() {
     articlePage.style.opacity = "";
     articlePage.style.overflowY = "";
     articlePage.style.pointerEvents = "";
+    articlePage.style.transition = "";
 
     document.body.style.overflow = "";
 
     activeCard = null;
     currentPostId = "";
+    sourceMorphRect = null;
     articleMorphDirection = null;
 
     history.replaceState(null, "", window.location.pathname);
@@ -1314,6 +1414,7 @@ backBtn.addEventListener("click", (e) => {
 /* ================================================================
    8. 分享
 ================================================================ */
+
 
 
 
